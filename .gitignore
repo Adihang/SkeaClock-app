@@ -1,0 +1,8 @@
+bin/*.obj
+bin/*.ini
+bin/*.png
+bin/*.pdb
+source/locate data/clock-layout.ini
+.vive-coding-helper/*
+!.vive-coding-helper/
+!.vive-coding-helper/file-notes.json

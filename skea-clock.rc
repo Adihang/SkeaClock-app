@@ -1,0 +1,2 @@
+#define SKEA_APP_ICON 1
+SKEA_APP_ICON ICON "source\\SkeaClock.ico"
