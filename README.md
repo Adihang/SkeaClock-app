@@ -10,9 +10,8 @@ Windows 화면에 스키아 시계를 띄워 두고, 꿀밤과 볼 당기기 상
 ## 다운로드 및 실행
 
 별도의 설치 과정은 필요하지 않습니다.
-
-1. 이 저장소의 **Releases**에서 최신 버전의 `SkeaClock.exe`를 다운로드합니다.
-2. 다운로드한 파일을 실행합니다.
+**[최신 버전 다운로드 (.exe)](https://github.com/junhwan123/SkeaClock/releases/latest/download/SkeaClock.exe)**
+상단 경로를 사용하거나 release 페이지에서 최신 버전을 다운받으세요.
 
 ## 사용 가이드
 
