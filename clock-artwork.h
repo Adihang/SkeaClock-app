@@ -8,6 +8,7 @@ constexpr float TouchRadius = DialRadius * 0.3f;
 constexpr float CheekTouchRadius = TouchRadius * 0.6f;
 constexpr float CharacterScale = 0.8f;
 constexpr float HandScale = 0.9f;
+constexpr float TimeHandLengthScales[2] = { .95f, 1.05f };
 constexpr float MaxInwardCheekPull = 0.3f;
 constexpr float CheekSeamOverlap = 1.0f;
 constexpr UINT HandReturnMs = 750;
@@ -85,6 +86,8 @@ bool blankPlaybackActive = false;
 ULONGLONG handReturnStart = 0;
 float handReturnStartTurns[2] = { .5f, .5f };
 float alarmHandStartTurns[2] = {};
+float handReturnStartLengthScales[2] = { 1.0f, 1.0f };
+float alarmHandStartLengthScales[2] = { 1.0f, 1.0f };
 
 bool ReadFrameEnds(Bitmap& image, std::vector<UINT>& ends) {
     const UINT count = image.GetFrameCount(&FrameDimensionTime);
@@ -445,7 +448,28 @@ bool HandsVisible() {
     return !cheekDragging && !touchReleaseActive && (!reactionActive || showingTransition);
 }
 
+float HandAnimationProgress(float progress) {
+    progress = std::clamp(progress, 0.0f, 1.0f);
+    return progress * progress * (3 - 2 * progress);
+}
+
+float HandLengthScale(int index, ULONGLONG tick) {
+    if (!HandsVisible()) return 1.0f;
+    float start = 1.0f, target = TimeHandLengthScales[index], progress = 1.0f;
+    if (alarmActive && !alarmPanicActive) {
+        start = alarmHandStartLengthScales[index];
+        target = 1.0f;
+        progress = (tick - animationStart) / static_cast<float>(AlarmHandGatherMs);
+    } else if (handReturnActive) {
+        start = handReturnStartLengthScales[index];
+        progress = (tick - handReturnStart) / static_cast<float>(HandReturnMs);
+    }
+    return start + (target - start) * HandAnimationProgress(progress);
+}
+
 void BeginAlarm(const SYSTEMTIME& now) {
+    const ULONGLONG tick = GetTickCount64();
+    for (int i = 0; i < 2; ++i) alarmHandStartLengthScales[i] = HandLengthScale(i, tick);
     cheekWarpBuffers.Release();
     blankPlaybackActive = false;
     reactionActive = false;
@@ -461,7 +485,7 @@ void BeginAlarm(const SYSTEMTIME& now) {
     alarmHandStartTurns[0] = HourTurn(now.wHour, now.wMinute, now.wSecond);
     alarmHandStartTurns[1] = MinuteTurn(now.wMinute, now.wSecond);
     activeFrame = 0;
-    animationStart = GetTickCount64();
+    animationStart = tick;
     idlePhaseOffset = 0;
     gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
 }
@@ -495,9 +519,11 @@ void EndBlankPlayback() {
 
 void DismissAlarmToIdle() {
     if (!alarmActive) return;
+    const ULONGLONG tick = GetTickCount64();
+    for (int i = 0; i < 2; ++i) handReturnStartLengthScales[i] = HandLengthScale(i, tick);
     alarmActive = false;
     alarmPanicActive = false;
-    animationStart = GetTickCount64();
+    animationStart = tick;
     idlePhaseOffset = 0;
     activeFrame = 0;
     gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
@@ -591,6 +617,7 @@ void CompleteTouchRelease(ULONGLONG now) {
     activeFrame = 0;
     handReturnActive = true;
     handReturnStartTurns[0] = handReturnStartTurns[1] = .5f;
+    handReturnStartLengthScales[0] = handReturnStartLengthScales[1] = 1.0f;
     handReturnStart = now;
     gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
 }
@@ -672,8 +699,7 @@ void StretchedHandTransform(Matrix& transform, const ClockHand& hand,
 }
 
 float AnimatedHandTurn(float start, float target, float progress) {
-    progress = std::clamp(progress, 0.0f, 1.0f);
-    const float eased = progress * progress * (3 - 2 * progress);
+    const float eased = HandAnimationProgress(progress);
     const float shortest = std::fmod(target - start + 1.5f, 1.0f) - 0.5f;
     return start + shortest * eased;
 }
@@ -845,13 +871,14 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
         }
     }
     if (HandsVisible()) {
+        const ULONGLONG tick = GetTickCount64();
         float turns[] = { HourTurn(now.wHour, now.wMinute, now.wSecond), MinuteTurn(now.wMinute, now.wSecond) };
         if (alarmActive && !alarmPanicActive) {
-            const float progress = (GetTickCount64() - animationStart) / static_cast<float>(AlarmHandGatherMs);
+            const float progress = (tick - animationStart) / static_cast<float>(AlarmHandGatherMs);
             turns[0] = AnimatedHandTurn(alarmHandStartTurns[0], AlarmHandTurn, progress);
             turns[1] = AnimatedHandTurn(alarmHandStartTurns[1], AlarmHandTurn, progress);
         } else if (handReturnActive) {
-            const ULONGLONG elapsed = GetTickCount64() - handReturnStart;
+            const ULONGLONG elapsed = tick - handReturnStart;
             if (elapsed >= HandReturnMs) {
                 handReturnActive = false;
             } else {
@@ -861,24 +888,25 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
             }
         }
         g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 1; i >= 0; --i) {
             auto& hand = clockHands[i];
             GraphicsState state = g.Save();
             Matrix transform;
             const bool idleHandCenter = CurrentGif() == gifImage.get() && activeFrame < frameCenters.size();
             const bool transitionHandCenter = CurrentGif() == transitionImage.get() &&
                 activeFrame < transitionSourceFrameEnds.size();
-            if (idleHandCenter || transitionHandCenter) {
-                Matrix fixedTipTransform;
-                HandTransform(fixedTipTransform, hand, turns[i], clockCenter);
-                PointF fixedTip = hand.tip;
-                fixedTipTransform.TransformPoints(&fixedTip, 1);
-                const PointF movingCenter = idleHandCenter ? IdleHandCenter(activeFrame) :
-                    TransitionHandCenter(activeFrame);
-                StretchedHandTransform(transform, hand, movingCenter, fixedTip);
-            } else {
-                HandTransform(transform, hand, turns[i], clockCenter);
+            Matrix fixedTipTransform;
+            HandTransform(fixedTipTransform, hand, turns[i], clockCenter);
+            PointF fixedTip = hand.tip;
+            fixedTipTransform.TransformPoints(&fixedTip, 1);
+            const float lengthScale = HandLengthScale(i, tick);
+            if (lengthScale != 1.0f) {
+                fixedTip.X = clockCenter.X + (fixedTip.X - clockCenter.X) * lengthScale;
+                fixedTip.Y = clockCenter.Y + (fixedTip.Y - clockCenter.Y) * lengthScale;
             }
+            const PointF movingCenter = idleHandCenter ? IdleHandCenter(activeFrame) :
+                transitionHandCenter ? TransitionHandCenter(activeFrame) : clockCenter;
+            StretchedHandTransform(transform, hand, movingCenter, fixedTip);
             g.MultiplyTransform(&transform);
             g.DrawImage(hand.image.get(), RectF(0, 0, static_cast<float>(hand.image->GetWidth()),
                 static_cast<float>(hand.image->GetHeight())), 0, 0, static_cast<float>(hand.image->GetWidth()),

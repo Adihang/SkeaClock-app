@@ -229,6 +229,7 @@ void AnimateBackground(HWND window) {
             if (!showingTransition) {
                 handReturnActive = true;
                 handReturnStartTurns[0] = handReturnStartTurns[1] = .5f;
+                handReturnStartLengthScales[0] = handReturnStartLengthScales[1] = 1.0f;
                 handReturnStart = now;
             }
             showingAngry = false;

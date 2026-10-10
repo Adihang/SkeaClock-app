@@ -1,6 +1,6 @@
 # Vive Coding Helper 파일 메모
 
-생성 시각: 2026-10-10T02:22:54.534Z
+생성 시각: 2026-10-10T12:30:27.799Z
 
 ## 파일 구조
 
@@ -28,7 +28,8 @@
     - menu-effects.png
     - menu-exceptions.png
     - menu-settings.png
-    - README.md
+- tests/
+  - hand-length-test.cpp
 - .gitignore
 - alarm-editor.h
 - build.cmd
@@ -60,6 +61,14 @@
 
 알람 에디터 UI 및 데이터 관리 로직 정의
 
+### clock-artwork.h
+
+- 경로: `clock-artwork.h`
+- 종류: 파일
+- 수정 시각: 2026-10-10T08:28:07.129Z
+
+클럭 아트워크 및 애니메이션 상태 관리
+
 ### clock-sound.h
 
 - 경로: `clock-sound.h`
@@ -76,21 +85,21 @@
 
 시계 창 전경 상태 및 최상위 제어 로직 관리
 
-### docs/images/README.md
+### distribution/guide.md
 
-- 경로: `docs/images/README.md`
+- 경로: `distribution/guide.md`
 - 종류: 파일
-- 수정 시각: 2026-10-10T01:39:10.338Z
+- 수정 시각: 2026-10-10T08:28:11.432Z
 
-시계 앱 UI 및 기능 스크린샷 모음집
+배포용 EXE 사용법, 빌드 절차 안내
 
 ### README.md
 
 - 경로: `README.md`
 - 종류: 파일
-- 수정 시각: 2026-10-10T02:22:54.527Z
+- 수정 시각: 2026-10-10T12:30:27.794Z
 
-시계 앱 사용법 및 상세 설정 안내
+스키아 시계 상세 사용 및 설정 가이드
 
 ### skea-clock.cpp
 
@@ -99,4 +108,12 @@
 - 수정 시각: 2026-10-10T00:27:45.482Z
 
 시계 애플리케이션의 메인 로직 및 UI 처리 파일
+
+### tests/hand-length-test.cpp
+
+- 경로: `tests/hand-length-test.cpp`
+- 종류: 파일
+- 수정 시각: 2026-10-10T08:28:21.791Z
+
+시계 바늘 길이 및 변형 로직 단위 테스트 파일
 
