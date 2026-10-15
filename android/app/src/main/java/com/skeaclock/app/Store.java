@@ -51,21 +51,35 @@ final class Store {
     return id;
   }
 
-  static int dial(Context c) {
-    int flags =
-        (prefs(c).getBoolean("background", true) ? 1 : 0)
-            | (prefs(c).getBoolean("ticks", true) ? 2 : 0)
-            | (prefs(c).getBoolean("numbers", true) ? 4 : 0);
+  static int dialBackground(Context c) {
     return new int[] {
-          R.drawable.dial_0,
-          R.drawable.dial_1,
-          R.drawable.dial_2,
-          R.drawable.dial_3,
-          R.drawable.dial_4,
-          R.drawable.dial_5,
-          R.drawable.dial_6,
-          R.drawable.dial_7
-        }
-        [flags];
+          R.drawable.widget_background_0,
+          R.drawable.widget_background_1,
+          R.drawable.widget_background_2,
+          R.drawable.widget_background_3,
+          R.drawable.widget_background_4,
+          R.drawable.widget_background_5,
+          R.drawable.widget_background_6,
+          R.drawable.widget_background_7
+        }[dialFlags(c)];
+  }
+
+  static int dialMarkers(Context c) {
+    return new int[] {
+          R.drawable.widget_markers_0,
+          R.drawable.widget_markers_1,
+          R.drawable.widget_markers_2,
+          R.drawable.widget_markers_3,
+          R.drawable.widget_markers_4,
+          R.drawable.widget_markers_5,
+          R.drawable.widget_markers_6,
+          R.drawable.widget_markers_7
+        }[dialFlags(c)];
+  }
+
+  private static int dialFlags(Context c) {
+    return (prefs(c).getBoolean("background", true) ? 1 : 0)
+        | (prefs(c).getBoolean("ticks", true) ? 2 : 0)
+        | (prefs(c).getBoolean("numbers", true) ? 4 : 0);
   }
 }

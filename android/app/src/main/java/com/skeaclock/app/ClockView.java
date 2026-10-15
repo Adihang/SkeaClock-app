@@ -33,6 +33,8 @@ public class ClockView extends View {
   private static final long CHEEK_PULL_RELEASE_MS = 480;
   private static final float CHARACTER_SCALE = 1.6f;
   private static final float DIAL_RADIUS = 216f;
+  // The generated widget dial mask spans pixels 12 through 468 in a 480px canvas.
+  private static final float WIDGET_DIAL_RADIUS = 228f;
   private static final int ROWS = 24, COLS = 24, STAR_COUNT = 6;
   private static final int HEAD_PADDING = 40;
 
@@ -54,6 +56,7 @@ public class ClockView extends View {
       angryAlt,
       panic;
   private final Bitmap hourHand, minuteHand;
+  private final Bitmap widgetIdleFrame;
   private final Bitmap touchComposite, releaseComposite, touchHeadBitmap, releaseHeadBitmap;
   private final Canvas touchCompositeCanvas, releaseCompositeCanvas, touchHeadCanvas, releaseHeadCanvas;
   private final float[] mesh = new float[(ROWS + 1) * (COLS + 1) * 2];
@@ -85,15 +88,31 @@ public class ClockView extends View {
   }
 
   ClockView(Context context, String widgetAction) {
-    this(context, false, widgetAnimationClips(widgetAction));
+    this(
+        context,
+        false,
+        widgetAnimationClips(widgetAction),
+        widgetEagerClips(widgetAction),
+        true);
   }
 
   private ClockView(Context context, boolean ringing, String[] requestedClips) {
+    this(context, ringing, requestedClips, requestedClips, false);
+  }
+
+  private ClockView(
+      Context context,
+      boolean ringing,
+      String[] requestedClips,
+      String[] eagerClips,
+      boolean widgetRenderer) {
     super(context);
     assets =
         requestedClips == null
             ? AnimationAssets.load(context)
-            : AnimationAssets.load(context, requestedClips);
+            : widgetRenderer
+                ? AnimationAssets.loadWidget(context, requestedClips, eagerClips)
+                : AnimationAssets.load(context, requestedClips);
     idle = clip("skea_idle");
     transition = clip("skea_transition");
     touchBack = clip("skea_touch_back");
@@ -109,6 +128,7 @@ public class ClockView extends View {
     panic = clip("skea_panic");
     hourHand = decode(R.drawable.hour_hand);
     minuteHand = decode(R.drawable.minute_hand);
+    widgetIdleFrame = widgetRenderer ? decode(R.drawable.widget_idle_frame) : null;
     if (touchBack != null) {
       touchComposite =
           Bitmap.createBitmap(touchBack.width, touchBack.height, Bitmap.Config.ARGB_8888);
@@ -163,6 +183,28 @@ public class ClockView extends View {
         };
   }
 
+  private static String[] widgetEagerClips(String action) {
+    if (MainActivity.WIDGET_BONK.equals(action)) return new String[] {"skea_smash"};
+    return new String[] {"skea_touch_back", "skea_touch_head", "skea_touch_front"};
+  }
+
+  void preloadWidgetAnimationRemainder(String action) {
+    if (MainActivity.WIDGET_BONK.equals(action)) {
+      assets.preload("skea_angry", "skea_angry_alt", "skea_transition");
+    } else {
+      assets.preload(
+          "skea_touch_end",
+          "skea_touch_end_back",
+          "skea_touch_end_head",
+          "skea_touch_end_front");
+    }
+  }
+
+  boolean isWidgetAnimationClipLoaded(String name) {
+    AnimationAssets.Clip clip = assets.clips.get(name);
+    return clip != null && clip.isLoaded();
+  }
+
   private AnimationAssets.Clip clip(String name) {
     return assets.clips.get(name);
   }
@@ -196,6 +238,10 @@ public class ClockView extends View {
 
   String modeName() {
     return mode.name();
+  }
+
+  boolean animationComplete() {
+    return mode == Mode.IDLE && !handReturn;
   }
 
   void triggerSmash() {
@@ -291,7 +337,7 @@ public class ClockView extends View {
     canvas.save();
     canvas.translate((getWidth() - size) / 2f, (getHeight() - size) / 2f);
     canvas.scale(size / 480f, size / 480f);
-    drawClock(canvas, now, elapsed);
+    drawClock(canvas, now, elapsed, false);
     canvas.restore();
     maybePlayIdle(now);
     postInvalidateDelayed(nextDelay(now));
@@ -304,28 +350,29 @@ public class ClockView extends View {
     canvas.save();
     canvas.translate((getWidth() - size) / 2f, (getHeight() - size) / 2f);
     canvas.scale(size / 480f, size / 480f);
-    drawClock(canvas, now, elapsed);
+    drawClock(canvas, now, elapsed, true);
     canvas.restore();
     maybePlayIdle(now);
   }
 
-  private void drawClock(Canvas c, long now, long elapsed) {
+  private void drawClock(Canvas c, long now, long elapsed, boolean widgetFrame) {
+    float dialRadius = widgetFrame ? WIDGET_DIAL_RADIUS : DIAL_RADIUS;
     if (showBackground) {
       paint.setColor(Color.rgb(0xdf, 0xf7, 0xf5));
       paint.setStyle(Paint.Style.FILL);
-      c.drawCircle(240, 240, DIAL_RADIUS, paint);
+      c.drawCircle(240, 240, dialRadius, paint);
     }
     c.save();
     Path dial = new Path();
-    dial.addCircle(240, 240, DIAL_RADIUS, Path.Direction.CW);
+    dial.addCircle(240, 240, dialRadius, Path.Direction.CW);
     c.clipPath(dial);
-    drawCharacter(c, now, elapsed);
+    drawCharacter(c, now, elapsed, widgetFrame);
     if (mode != Mode.PANIC
         && mode != Mode.TOUCH
         && mode != Mode.RELEASE
         && !(mode == Mode.SMASH && reactionStage(elapsed) != 3)) drawHands(c, now, elapsed);
     c.restore();
-    drawMarkers(c);
+    drawMarkers(c, widgetFrame);
     drawStars(c, now);
   }
 
@@ -375,10 +422,10 @@ public class ClockView extends View {
     return angryAlt.duration() - 1;
   }
 
-  private void drawCharacter(Canvas c, long now, long elapsed) {
+  private void drawCharacter(Canvas c, long now, long elapsed, boolean widgetFrame) {
     switch (mode) {
       case IDLE:
-        drawMovie(c, idle, idleOffset + elapsed, 0, 0);
+        drawIdle(c, idleOffset + elapsed, widgetFrame);
         break;
       case SMASH:
         int stage = reactionStage(elapsed);
@@ -405,7 +452,7 @@ public class ClockView extends View {
           handReturnStarted = now;
           handReturnFromHour = handReturnFromMinute = .5f;
           idleSoundAt = now + 350;
-          drawMovie(c, idle, idleOffset, 0, 0);
+          drawIdle(c, idleOffset, widgetFrame);
         }
         break;
       case TOUCH:
@@ -425,7 +472,7 @@ public class ClockView extends View {
           handReturnStarted = now;
           handReturnFromHour = handReturnFromMinute = .5f;
           idleSoundAt = now + 350;
-          drawMovie(c, idle, 0, 0, 0);
+          drawIdle(c, 0, widgetFrame);
         }
         break;
       case PANIC:
@@ -452,9 +499,13 @@ public class ClockView extends View {
     return reactionStartAlt() + adjustedAltDuration();
   }
 
+  private void drawIdle(Canvas c, long time, boolean widgetFrame) {
+    if (widgetFrame && widgetIdleFrame != null) c.drawBitmap(widgetIdleFrame, 0, 0, paint);
+    else drawMovie(c, idle, time, 0, 0);
+  }
+
   private void drawMovie(
       Canvas c, AnimationAssets.Clip clip, long time, float offsetX, float offsetY) {
-    clip.movie.setTime((int) Math.floorMod(time, (long) clip.duration()));
     float centerX = clip == idle ? idleCenterX(time) : idle.centers[0][0];
     float centerY = clip == idle ? idleCenterY(time) : idle.centers[0][1];
     float x = 240 - centerX * CHARACTER_SCALE + offsetX * CHARACTER_SCALE;
@@ -462,7 +513,7 @@ public class ClockView extends View {
     c.save();
     c.translate(x, y);
     c.scale(CHARACTER_SCALE, CHARACTER_SCALE);
-    clip.movie.draw(c, 0, 0, paint);
+    clip.draw(getContext(), c, time, 0, 0, paint);
     c.restore();
   }
 
@@ -475,12 +526,7 @@ public class ClockView extends View {
   }
 
   private float centerAxis(long t, int axis) {
-    int frame = idle.frameAt(t), next = (frame + 1) % idle.centers.length;
-    float within =
-        (float) (Math.floorMod(t, (long) idle.duration()) - idle.frameStart(frame))
-            / (idle.frameEnd(frame) - idle.frameStart(frame));
-    return idle.centers[frame][axis]
-        + (idle.centers[next][axis] - idle.centers[frame][axis]) * within;
+    return idle.centers[idle.frameAt(t)][axis];
   }
 
   private void drawTouch(
@@ -491,21 +537,18 @@ public class ClockView extends View {
       long elapsed,
       boolean releasing) {
     int frame = back.frameAt(elapsed);
-    back.movie.setTime((int) Math.floorMod(elapsed, (long) back.duration()));
-    head.movie.setTime((int) Math.floorMod(elapsed, (long) head.duration()));
-    front.movie.setTime((int) Math.floorMod(elapsed, (long) front.duration()));
     float left = 240 - idle.centers[0][0] * CHARACTER_SCALE,
         top = 240 - idle.centers[0][1] * CHARACTER_SCALE;
     Bitmap composite = releasing ? releaseComposite : touchComposite;
     Canvas buffer = releasing ? releaseCompositeCanvas : touchCompositeCanvas;
     buffer.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-    back.movie.draw(buffer, 0, 0, paint);
+    back.draw(getContext(), buffer, elapsed, 0, 0, paint);
     float hx = releasing ? touchEndHead.offsetX : touchHead.offsetX,
         hy = releasing ? touchEndHead.offsetY : touchHead.offsetY;
     Bitmap headBitmap = releasing ? releaseHeadBitmap : touchHeadBitmap;
     Canvas headBuffer = releasing ? releaseHeadCanvas : touchHeadCanvas;
     headBuffer.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-    head.movie.draw(headBuffer, HEAD_PADDING, HEAD_PADDING, paint);
+    head.draw(getContext(), headBuffer, elapsed, HEAD_PADDING, HEAD_PADDING, paint);
     c.save();
     c.translate(left, top);
     c.scale(CHARACTER_SCALE, CHARACTER_SCALE);
@@ -518,7 +561,7 @@ public class ClockView extends View {
         left + (releasing ? touchEndFront.offsetX : touchFront.offsetX) * CHARACTER_SCALE,
         top + (releasing ? touchEndFront.offsetY : touchFront.offsetY) * CHARACTER_SCALE);
     c.scale(CHARACTER_SCALE, CHARACTER_SCALE);
-    front.movie.draw(c, 0, 0, paint);
+    front.draw(getContext(), c, elapsed, 0, 0, paint);
     c.restore();
   }
 
@@ -610,39 +653,43 @@ public class ClockView extends View {
     c.drawBitmap(image, matrix, paint);
   }
 
-  private void drawMarkers(Canvas c) {
+  private void drawMarkers(Canvas c, boolean widgetFrame) {
     float cx = 240, cy = 240;
     if (showTicks) {
       line.setStrokeCap(Paint.Cap.ROUND);
       for (int i = 0; i < 60; i++) {
-        if (showNumbers && i % 5 == 0) continue;
+        if (!widgetFrame && showNumbers && i % 5 == 0) continue;
         double a = i * Math.PI / 30;
         boolean major = i % 5 == 0;
-        line.setStrokeWidth(major ? 6 : 3);
-        line.setColor(major ? 0xff435058 : 0xdc54636d);
-        float r = DIAL_RADIUS, inner = r - (major ? 28 : 14);
+        float outer = widgetFrame ? 225f : DIAL_RADIUS;
+        float inner =
+            widgetFrame
+                ? (major ? 207f : 215f)
+                : outer - (major ? 28f : 14f);
+        line.setStrokeWidth(widgetFrame ? (major ? 4f : 3f) : (major ? 6f : 3f));
+        line.setColor(widgetFrame ? 0xff54636d : (major ? 0xff435058 : 0xdc54636d));
         c.drawLine(
             cx + (float) Math.sin(a) * inner,
             cy - (float) Math.cos(a) * inner,
-            cx + (float) Math.sin(a) * r,
-            cy - (float) Math.cos(a) * r,
+            cx + (float) Math.sin(a) * outer,
+            cy - (float) Math.cos(a) * outer,
             line);
       }
     }
     if (showNumbers) {
       line.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-      line.setTextSize(32);
+      line.setTextSize(widgetFrame ? 30 : 32);
       line.setTextAlign(Paint.Align.CENTER);
-      line.setStrokeWidth(5);
+      line.setStrokeWidth(widgetFrame ? 4 : 5);
       line.setStrokeJoin(Paint.Join.ROUND);
       line.setStyle(Paint.Style.STROKE);
       line.setColor(Color.WHITE);
       for (int i = 1; i <= 12; i++) {
         double a = i * Math.PI / 6;
-        float x = cx + (float) Math.sin(a) * (DIAL_RADIUS - 28),
+        float x = cx + (float) Math.sin(a) * (widgetFrame ? 193f : DIAL_RADIUS - 28),
             y =
                 cy
-                    - (float) Math.cos(a) * (DIAL_RADIUS - 28)
+                    - (float) Math.cos(a) * (widgetFrame ? 193f : DIAL_RADIUS - 28)
                     - (line.ascent() + line.descent()) / 2;
         c.drawText(Integer.toString(i), x, y, line);
       }
@@ -650,10 +697,10 @@ public class ClockView extends View {
       line.setColor(0xff323f48);
       for (int i = 1; i <= 12; i++) {
         double a = i * Math.PI / 6;
-        float x = cx + (float) Math.sin(a) * (DIAL_RADIUS - 28),
+        float x = cx + (float) Math.sin(a) * (widgetFrame ? 193f : DIAL_RADIUS - 28),
             y =
                 cy
-                    - (float) Math.cos(a) * (DIAL_RADIUS - 28)
+                    - (float) Math.cos(a) * (widgetFrame ? 193f : DIAL_RADIUS - 28)
                     - (line.ascent() + line.descent()) / 2;
         c.drawText(Integer.toString(i), x, y, line);
       }

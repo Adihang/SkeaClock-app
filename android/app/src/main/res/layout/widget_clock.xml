@@ -21,9 +21,25 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:adjustViewBounds="true"
-                android:src="@drawable/dial_7"
+                android:src="@drawable/widget_background_7"
                 android:scaleType="fitCenter"
-                android:contentDescription="시계 문자판" />
+                android:contentDescription="시계 배경" />
+
+            <ImageView
+                android:id="@+id/widget_idle_character"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/widget_idle"
+                android:scaleType="fitCenter"
+                android:contentDescription="흔들리는 캐릭터" />
+
+            <ImageView
+                android:id="@+id/dial_markers"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/widget_markers_7"
+                android:scaleType="fitCenter"
+                android:contentDescription="시계 눈금과 숫자" />
 
             <AnalogClock
                 android:id="@+id/hands"
@@ -32,15 +48,6 @@
                 android:dial="@drawable/empty_dial"
                 android:hand_hour="@drawable/hour_hand"
                 android:hand_minute="@drawable/minute_hand" />
-
-            <ImageView
-                android:id="@+id/widget_action_frame"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@android:color/transparent"
-                android:contentDescription="캐릭터 반응 애니메이션"
-                android:scaleType="fitCenter"
-                android:visibility="gone" />
 
             <GridLayout
                 android:id="@+id/widget_action_grid"

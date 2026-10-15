@@ -7,14 +7,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.media.MediaPlayer;
+import android.os.HandlerThread;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
 import android.os.SystemClock;
 import android.view.View;
 import android.widget.RemoteViews;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** Renders widget interactions into RemoteViews without opening the app activity. */
 public final class WidgetActionReceiver extends BroadcastReceiver {
@@ -24,12 +29,30 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
   static final String EXTRA_X = "com.skeaclock.app.WIDGET_ACTION_X";
   static final String EXTRA_Y = "com.skeaclock.app.WIDGET_ACTION_Y";
 
-  private static final int FRAME_SIZE = 480;
-  private static final long FRAME_INTERVAL_MS = 60;
+  private static final int VIEW_SIZE = 480;
+  private static final int FRAME_SIZE = 400;
+  private static final long FRAME_INTERVAL_MS = 50;
   private static final long CHEEK_PULL_HOLD_MS = 2000;
   private static final long MAX_ANIMATION_MS = 8000;
-  private static final Handler MAIN = new Handler(Looper.getMainLooper());
+  private static final long REPEAT_TAP_COOLDOWN_MS = 500;
+  private static final HandlerThread RENDER_THREAD = new HandlerThread("SkeaWidgetRender");
+  private static final HandlerThread AUDIO_THREAD = new HandlerThread("SkeaWidgetAudio");
+  private static final HandlerThread ASSET_THREAD =
+      new HandlerThread("SkeaWidgetAssets", Process.THREAD_PRIORITY_BACKGROUND);
+  private static final Handler RENDER;
+  private static final Handler AUDIO;
+  private static final Handler ASSETS;
   private static final Map<Integer, AnimationRun> ACTIVE = new HashMap<>();
+  private static final Set<Integer> BUSY_WIDGETS = new HashSet<>();
+
+  static {
+    RENDER_THREAD.start();
+    AUDIO_THREAD.start();
+    ASSET_THREAD.start();
+    RENDER = new Handler(RENDER_THREAD.getLooper());
+    AUDIO = new Handler(AUDIO_THREAD.getLooper());
+    ASSETS = new Handler(ASSET_THREAD.getLooper());
+  }
 
   @Override
   public void onReceive(Context context, Intent intent) {
@@ -40,7 +63,27 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
     final String action = intent.getStringExtra(EXTRA_ACTION);
     final float x = intent.getFloatExtra(EXTRA_X, 0f);
     final float y = intent.getFloatExtra(EXTRA_Y, 0f);
-    MAIN.post(() -> start(appContext, widgetId, action, x, y, pending));
+    if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID
+        || (!MainActivity.WIDGET_BONK.equals(action)
+            && !MainActivity.WIDGET_CHEEK.equals(action))) {
+      pending.finish();
+      return;
+    }
+
+    // Reserve the widget before posting to the render thread so taps already queued by Android
+    // cannot start another animation after the current one finishes.
+    boolean reserved;
+    synchronized (ACTIVE) {
+      reserved = BUSY_WIDGETS.add(widgetId);
+    }
+    if (!reserved) {
+      pending.finish();
+      return;
+    }
+    if (!RENDER.post(() -> start(appContext, widgetId, action, x, y, pending))) {
+      releaseWidget(widgetId);
+      pending.finish();
+    }
   }
 
   private static void start(
@@ -48,20 +91,24 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
     if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID
         || (!MainActivity.WIDGET_BONK.equals(action)
             && !MainActivity.WIDGET_CHEEK.equals(action))) {
+      releaseWidget(widgetId);
       pending.finish();
       return;
     }
-    AppWidgetManager manager = AppWidgetManager.getInstance(context);
-    if (manager.getAppWidgetInfo(widgetId) == null) {
+    final AppWidgetManager manager;
+    try {
+      manager = AppWidgetManager.getInstance(context);
+      if (manager.getAppWidgetInfo(widgetId) == null) {
+        releaseWidget(widgetId);
+        pending.finish();
+        return;
+      }
+    } catch (RuntimeException error) {
+      android.util.Log.e("SkeaClock", "Could not prepare widget animation", error);
+      releaseWidget(widgetId);
       pending.finish();
       return;
     }
-
-    AnimationRun previous;
-    synchronized (ACTIVE) {
-      previous = ACTIVE.remove(widgetId);
-    }
-    if (previous != null) previous.finish(true);
 
     AnimationRun run = new AnimationRun(context, manager, widgetId, action, x, y, pending);
     synchronized (ACTIVE) {
@@ -79,8 +126,10 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
     private final PendingResult pending;
     private long startedAt;
     private ClockView clock;
+    private Bitmap frameBitmap;
+    private Canvas frameCanvas;
     private MediaPlayer player;
-    private boolean released, finished;
+    private boolean firstFrame = true, released, finished;
 
     AnimationRun(
         Context context,
@@ -107,13 +156,18 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
             Store.prefs(context).getBoolean("ticks", true),
             Store.prefs(context).getBoolean("numbers", true));
         clock.setEffects(this::playEffect);
-        int measure = View.MeasureSpec.makeMeasureSpec(FRAME_SIZE, View.MeasureSpec.EXACTLY);
+        int measure = View.MeasureSpec.makeMeasureSpec(VIEW_SIZE, View.MeasureSpec.EXACTLY);
         clock.measure(measure, measure);
-        clock.layout(0, 0, FRAME_SIZE, FRAME_SIZE);
+        clock.layout(0, 0, VIEW_SIZE, VIEW_SIZE);
+        frameBitmap = Bitmap.createBitmap(FRAME_SIZE, FRAME_SIZE, Bitmap.Config.ARGB_8888);
+        frameCanvas = new Canvas(frameBitmap);
+        float scale = FRAME_SIZE / (float) VIEW_SIZE;
+        frameCanvas.scale(scale, scale);
         if (MainActivity.WIDGET_BONK.equals(action)) clock.triggerSmash(x, y);
         else clock.triggerWidgetCheekPull(x, y);
         startedAt = SystemClock.uptimeMillis();
         drawFrame();
+        if (!finished) ASSETS.post(() -> clock.preloadWidgetAnimationRemainder(action));
       } catch (RuntimeException error) {
         android.util.Log.e("SkeaClock", "Widget animation failed", error);
         finish(true);
@@ -140,13 +194,16 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
         released = true;
       }
 
-      Bitmap frame = Bitmap.createBitmap(FRAME_SIZE, FRAME_SIZE, Bitmap.Config.ARGB_8888);
-      clock.drawWidgetFrame(new Canvas(frame));
+      frameBitmap.eraseColor(Color.TRANSPARENT);
+      clock.drawWidgetFrame(frameCanvas);
       RemoteViews update = new RemoteViews(context.getPackageName(), R.layout.widget_clock);
-      update.setViewVisibility(R.id.dial, View.INVISIBLE);
-      update.setViewVisibility(R.id.hands, View.INVISIBLE);
-      update.setImageViewBitmap(R.id.widget_action_frame, frame);
-      update.setViewVisibility(R.id.widget_action_frame, View.VISIBLE);
+      if (firstFrame) {
+        update.setViewVisibility(R.id.widget_idle_character, View.VISIBLE);
+        update.setViewVisibility(R.id.dial_markers, View.INVISIBLE);
+        update.setViewVisibility(R.id.hands, View.INVISIBLE);
+        firstFrame = false;
+      }
+      update.setImageViewBitmap(R.id.widget_idle_character, frameBitmap);
       try {
         manager.partiallyUpdateAppWidget(widgetId, update);
       } catch (RuntimeException error) {
@@ -155,40 +212,46 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
         return;
       }
 
-      if (("IDLE".equals(clock.modeName()) && elapsed > 300)
-          || elapsed >= MAX_ANIMATION_MS) {
+      if (clock.animationComplete() || elapsed >= MAX_ANIMATION_MS) {
         finish(true);
       } else {
-        MAIN.postDelayed(this, FRAME_INTERVAL_MS);
+        RENDER.postDelayed(this, FRAME_INTERVAL_MS);
       }
     }
 
     private void playEffect(String name) {
-      int resource = context.getResources().getIdentifier(name, "raw", context.getPackageName());
-      if (resource == 0) return;
-      releasePlayer();
-      player = MediaPlayer.create(context, resource);
-      if (player == null) return;
-      float volume = Store.prefs(context).getInt("effects", 80) / 100f;
-      player.setVolume(volume, volume);
-      player.setOnCompletionListener(
-          completed -> {
-            completed.release();
-            if (player == completed) player = null;
+      AUDIO.post(
+          () -> {
+            int resource =
+                context.getResources().getIdentifier(name, "raw", context.getPackageName());
+            if (resource == 0) return;
+            releasePlayerNow();
+            player = MediaPlayer.create(context, resource);
+            if (player == null) return;
+            float volume = Store.prefs(context).getInt("effects", 80) / 100f;
+            player.setVolume(volume, volume);
+            player.setOnCompletionListener(
+                completed -> {
+                  completed.release();
+                  if (player == completed) player = null;
+                });
+            player.start();
           });
-      player.start();
     }
 
     void finish(boolean restoreWidget) {
       if (finished) return;
       finished = true;
-      MAIN.removeCallbacks(this);
+      RENDER.removeCallbacks(this);
       try {
         if (restoreWidget && manager.getAppWidgetInfo(widgetId) != null) {
           RemoteViews restore = new RemoteViews(context.getPackageName(), R.layout.widget_clock);
-          restore.setViewVisibility(R.id.dial, View.VISIBLE);
+          restore.setImageViewResource(R.id.dial, Store.dialBackground(context));
+          restore.setImageViewResource(R.id.dial_markers, Store.dialMarkers(context));
+          restore.setImageViewResource(R.id.widget_idle_character, R.drawable.widget_idle);
+          restore.setViewVisibility(R.id.dial_markers, View.VISIBLE);
+          restore.setViewVisibility(R.id.widget_idle_character, View.VISIBLE);
           restore.setViewVisibility(R.id.hands, View.VISIBLE);
-          restore.setViewVisibility(R.id.widget_action_frame, View.GONE);
           manager.partiallyUpdateAppWidget(widgetId, restore);
         }
       } catch (RuntimeException error) {
@@ -198,15 +261,28 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
         synchronized (ACTIVE) {
           if (ACTIVE.get(widgetId) == this) ACTIVE.remove(widgetId);
         }
+        if (!RENDER.postDelayed(() -> releaseWidget(widgetId), REPEAT_TAP_COOLDOWN_MS)) {
+          releaseWidget(widgetId);
+        }
         pending.finish();
       }
     }
 
     private void releasePlayer() {
+      AUDIO.post(this::releasePlayerNow);
+    }
+
+    private void releasePlayerNow() {
       if (player == null) return;
       player.setOnCompletionListener(null);
       player.release();
       player = null;
+    }
+  }
+
+  private static void releaseWidget(int widgetId) {
+    synchronized (ACTIVE) {
+      BUSY_WIDGETS.remove(widgetId);
     }
   }
 }

@@ -1,0 +1,4 @@
+<animated-image xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/widget_idle_loop"
+    android:autoStart="true"
+    android:repeatCount="infinite" />

@@ -43,7 +43,9 @@ public class ClockWidget extends AppWidgetProvider {
   public void onUpdate(Context c, AppWidgetManager manager, int[] ids) {
     for (int id : ids) {
       RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget_clock);
-      v.setImageViewResource(R.id.dial, Store.dial(c));
+      v.setImageViewResource(R.id.dial, Store.dialBackground(c));
+      v.setImageViewResource(R.id.widget_idle_character, R.drawable.widget_idle);
+      v.setImageViewResource(R.id.dial_markers, Store.dialMarkers(c));
       for (int i = 0; i < CONTROLS.length; i++) {
         int row = i / INPUT_GRID_SIZE;
         int column = i % INPUT_GRID_SIZE;

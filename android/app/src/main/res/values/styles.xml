@@ -11,10 +11,13 @@
         <item name="android:layout_height">0dp</item>
         <item name="android:layout_columnWeight">1</item>
         <item name="android:layout_rowWeight">1</item>
+        <item name="android:layout_gravity">fill</item>
         <item name="android:background">@android:color/transparent</item>
         <item name="android:textColor">@android:color/transparent</item>
         <item name="android:textSize">1sp</item>
         <item name="android:includeFontPadding">false</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
     </style>
     <string name="app_name">스키아 시계</string>
     <string name="widget_description">시계만 표시하며, 시계 위의 투명한 5×5 입력 영역으로 꿀밤과 16방향 볼 당기기를 실행합니다.</string>

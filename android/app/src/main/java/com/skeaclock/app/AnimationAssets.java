@@ -1,8 +1,11 @@
 package com.skeaclock.app;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.Movie;
+import android.graphics.Paint;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
 import java.util.Map;
 import org.json.JSONArray;
@@ -10,6 +13,8 @@ import org.json.JSONObject;
 
 /** Original frame timings and alignment metadata extracted from the bundled Windows artwork. */
 final class AnimationAssets {
+  private static final Map<String, SoftReference<Movie>> MOVIE_CACHE = new HashMap<>();
+
   private static final String[] ALL_CLIPS = {
     "skea_idle",
     "skea_transition",
@@ -28,14 +33,17 @@ final class AnimationAssets {
   };
 
   static final class Clip {
-    final Movie movie;
+    final String name;
+    final int resourceId;
     final int[] ends;
     final int width, height;
     final float offsetX, offsetY, pointX, pointY, radius;
     final float[][] landmarks, centers;
+    private volatile Movie movie;
 
-    Clip(Movie movie, JSONObject json) throws Exception {
-      this.movie = movie;
+    Clip(String name, int resourceId, JSONObject json) throws Exception {
+      this.name = name;
+      this.resourceId = resourceId;
       width = json.getInt("width");
       height = json.getInt("height");
       JSONArray durations = json.getJSONArray("durations");
@@ -83,18 +91,68 @@ final class AnimationAssets {
     int frameEnd(int frame) {
       return ends[Math.min(frame, ends.length - 1)];
     }
+
+    void preload(Context context) {
+      movie(context);
+    }
+
+    boolean isLoaded() {
+      return movie != null;
+    }
+
+    void draw(Context context, Canvas canvas, long time, float x, float y, Paint paint) {
+      Movie current = movie(context);
+      synchronized (current) {
+        current.setTime((int) Math.floorMod(time, (long) duration()));
+        current.draw(canvas, x, y, paint);
+      }
+    }
+
+    private Movie movie(Context context) {
+      Movie current = movie;
+      if (current != null) return current;
+      synchronized (MOVIE_CACHE) {
+        current = movie;
+        if (current == null) {
+          SoftReference<Movie> cached = MOVIE_CACHE.get(name);
+          current = cached == null ? null : cached.get();
+          if (current == null) {
+            try (InputStream gif = context.getResources().openRawResource(resourceId)) {
+              current = Movie.decodeStream(gif);
+            } catch (Exception error) {
+              throw new IllegalStateException("Could not load Skea animation: " + name, error);
+            }
+            if (current == null) throw new IllegalStateException("Invalid GIF: " + name);
+            MOVIE_CACHE.put(name, new SoftReference<>(current));
+          }
+          movie = current;
+        }
+      }
+      return current;
+    }
   }
 
   final Map<String, Clip> clips = new HashMap<>();
+  private final Context context;
 
-  private AnimationAssets() {}
+  private AnimationAssets(Context context) {
+    this.context = context.getApplicationContext();
+  }
 
   static AnimationAssets load(Context context) {
     return load(context, ALL_CLIPS);
   }
 
   static AnimationAssets load(Context context, String... names) {
-    AnimationAssets result = new AnimationAssets();
+    return load(context, names, names);
+  }
+
+  static AnimationAssets loadWidget(Context context, String[] names, String... eagerNames) {
+    return load(context, names, eagerNames);
+  }
+
+  private static AnimationAssets load(Context context, String[] names, String[] eagerNames) {
+    AnimationAssets result = new AnimationAssets(context);
     try (InputStream input = context.getAssets().open("skea_animation.json")) {
       byte[] bytes = new byte[input.available()];
       int offset = 0;
@@ -104,11 +162,10 @@ final class AnimationAssets {
       for (String name : names) {
         JSONObject json = definitions.getJSONObject(name);
         int id = context.getResources().getIdentifier(name, "raw", context.getPackageName());
-        try (InputStream gif = context.getResources().openRawResource(id)) {
-          Movie movie = Movie.decodeStream(gif);
-          if (movie == null) throw new IllegalStateException("Invalid GIF: " + name);
-          result.clips.put(name, new Clip(movie, json));
-        }
+        if (id == 0) throw new IllegalStateException("Missing GIF resource: " + name);
+        Clip clip = new Clip(name, id, json);
+        result.clips.put(name, clip);
+        if (contains(eagerNames, name)) clip.preload(result.context);
       }
       if (result.clips.size() != names.length)
         throw new IllegalStateException("Missing character animation");
@@ -116,5 +173,17 @@ final class AnimationAssets {
     } catch (Exception e) {
       throw new IllegalStateException("Could not load Skea animations", e);
     }
+  }
+
+  void preload(String... names) {
+    for (String name : names) {
+      Clip clip = clips.get(name);
+      if (clip != null) clip.preload(context);
+    }
+  }
+
+  private static boolean contains(String[] values, String value) {
+    for (String candidate : values) if (candidate.equals(value)) return true;
+    return false;
   }
 }
