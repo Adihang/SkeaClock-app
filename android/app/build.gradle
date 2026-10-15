@@ -1,0 +1,7 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.skeaclock.app'
+    compileSdk 36
+    defaultConfig { applicationId 'com.skeaclock.app'; minSdk 26; targetSdk 36; versionCode 1; versionName '1.0.0'; testInstrumentationRunner 'com.skeaclock.app.SmokeInstrumentation' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

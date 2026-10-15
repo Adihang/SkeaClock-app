@@ -1,0 +1,23 @@
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#29796E</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F7F9F5</item>
+    </style>
+    <style name="WidgetTouchTarget">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:layout_rowWeight">1</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:textColor">@android:color/transparent</item>
+        <item name="android:textSize">1sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+    <string name="app_name">스키아 시계</string>
+    <string name="widget_description">시계만 표시하며, 시계 위의 투명한 5×5 입력 영역으로 꿀밤과 16방향 볼 당기기를 실행합니다.</string>
+    <string name="widget_cover_label">스키아 시계 커버 위젯</string>
+    <string name="widget_cover_description">Z 플립 커버 화면에서 시계만 표시하고 투명한 5×5 입력 영역으로 캐릭터를 조작합니다.</string>
+</resources>

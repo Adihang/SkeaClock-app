@@ -9,6 +9,53 @@
 스키아를 시계로 사용해 보세요.  
 Windows 화면에 스키아 시계를 띄워 두고, 꿀밤과 볼 당기기 상호작용을 즐기거나 알람을 설정할 수 있습니다.
 
+## Android 앱
+
+스키아 캐릭터 시계, 알람, 캐릭터 상호작용을 Android 앱 화면과 홈 화면 위젯에서 사용할 수 있습니다.
+
+<p>
+  <a href="https://raw.githubusercontent.com/Adihang/SkeaClock-app/main/android/downloads/SkeaClock-Android-debug.apk">
+    <img src="https://img.shields.io/badge/Android%20APK-%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android APK 다운로드">
+  </a>
+</p>
+
+### 주요 기능
+
+- 캐릭터가 움직일 때 시계 바늘도 함께 흔들리는 아날로그 시계
+- 알람 추가·수정·삭제, 반복 요일, 알람음 파일, 진동, 다시 알림 설정
+- 시계 배경·눈금·숫자와 12/24시간 표시, 알람·효과음 조절
+- 앱에서 꿀밤과 볼 당기기 애니메이션 실행. 앱에서는 손가락을 떼면 바로 튕김 반응 재생
+- 홈 화면 위젯에는 시계만 표시하고, 보이지 않는 5×5 터치 영역에서 꿀밤과 최대 16방향 볼 당기기 애니메이션을 앱 화면으로 이동하지 않고 바로 실행. 위젯 볼 당기기는 당김 자세를 2초 유지한 뒤 튕김 반응 재생
+- Galaxy Z Flip의 지원 모델에서는 커버 화면 위젯에서도 캐릭터 상호작용 사용
+
+### 앱 화면과 위젯
+
+| 시계 화면 | 알람 설정 |
+| --- | --- |
+| ![스키아 시계 화면](android/docs/clock.png) | ![알람 시간과 반복 요일 설정 화면](android/docs/alarm-editor.png) |
+
+| 설정 화면 | 홈 화면 위젯 |
+| --- | --- |
+| ![시계 모양과 소리를 설정하는 화면](android/docs/settings.png) | ![시계만 보이고 보이지 않는 입력 영역으로 상호작용하는 위젯](android/docs/widget.png) |
+
+### 설치 방법
+
+1. 위의 **Android APK 다운로드** 버튼을 눌러 APK를 받습니다.
+2. 다운로드한 APK를 열고, 안내가 나오면 브라우저나 파일 앱의 **이 출처 허용**을 켜서 설치를 진행합니다.
+3. 앱의 **알람** 탭에서 알람을 사용할 때 필요한 정확한 알람·알림 권한을 허용합니다.
+4. 위젯은 홈 화면을 길게 눌러 **위젯 → 스키아 시계**를 추가합니다. 위젯에는 시계만 보입니다. 5×5 투명 입력 영역에서 가운데와 좌우 3칸, 그 바로 위 3칸을 누르면 위젯 안에서 꿀밤 애니메이션이, 나머지 19칸을 누르면 선택한 방향의 볼 당기기 애니메이션이 바로 실행됩니다. 이 배치는 16방향의 당김 방향을 제공합니다.
+
+Galaxy Z Flip에서는 기기를 펼쳐 **설정 → 커버 화면 → 위젯**에서 스키아 시계를 추가합니다. 모델과 One UI 버전에 따라 커버 화면 위젯 또는 커버 화면 앱 실행을 지원하지 않을 수 있습니다.
+
+이 APK는 직접 설치해 확인할 수 있는 **디버그 서명 빌드**입니다. Google Play 배포용 서명은 포함되어 있지 않습니다. 직접 빌드하려면 JDK 17 이상과 Android SDK Platform 36을 설치한 뒤 아래 명령을 실행합니다.
+
+```sh
+cd android
+./gradlew assembleDebug lintDebug
+```
+
+빌드 결과: `android/app/build/outputs/apk/debug/app-debug.apk`. 알람 권한, Galaxy 커버 위젯 설정과 검증 방법은 [Android 상세 안내](android/README.md)를 참고하세요.
+
 ## 다운로드 및 실행
 
 별도의 설치 과정은 필요하지 않습니다.
