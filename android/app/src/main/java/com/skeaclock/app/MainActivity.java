@@ -68,6 +68,11 @@ public class MainActivity extends Activity {
   }
 
   @Override
+  protected void attachBaseContext(Context newBase) {
+    super.attachBaseContext(LocaleHelper.onAttach(newBase));
+  }
+
+  @Override
   protected void onSaveInstanceState(Bundle b) {
     b.putInt("tab", tab);
     super.onSaveInstanceState(b);
