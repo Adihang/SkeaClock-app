@@ -1,7 +1,0 @@
-Codicons by Microsoft and contributors
-https://github.com/microsoft/vscode-codicons
-License: Creative Commons Attribution 4.0 International (CC BY 4.0)
-https://creativecommons.org/licenses/by/4.0/
-
-The bell, move, vm, close, and globe glyphs were converted to transparent ICO
-images at multiple resolutions. Their color follows the Windows menu text color.

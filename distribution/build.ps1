@@ -92,6 +92,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Resource compilation failed.' }
     & cl.exe /nologo /std:c++17 /W4 /WX /O2 /MT /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 skea-clock.cpp assets.res /Fo:clock.obj /Fe:SkeaClock.exe /link /SUBSYSTEM:WINDOWS
     if ($LASTEXITCODE -ne 0) { throw 'C++ compilation failed.' }
+    & (Join-Path $PSScriptRoot 'update-metadata.ps1') -ExePath (Join-Path $work 'SkeaClock.exe')
     Copy-Item -LiteralPath (Join-Path $work 'SkeaClock.exe') -Destination (Join-Path $PSScriptRoot 'SkeaClock.exe') -Force
 } finally { Pop-Location }
 Set-Location -LiteralPath $PSScriptRoot
