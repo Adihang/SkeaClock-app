@@ -25,6 +25,7 @@ Clear-Work
 New-Item -ItemType Directory -Path $work | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'skea-clock.cpp'), (Join-Path $root 'prepare-assets.ps1') -Destination $work
 Get-ChildItem -LiteralPath $root -Filter '*.h' -File | Copy-Item -Destination $work
+Copy-Item -LiteralPath (Join-Path $root 'languages') -Destination $work -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'standalone.h') -Destination $work
 
 # Prepare coordinates in an isolated copy; the original source tree is read-only.
@@ -44,7 +45,7 @@ $paths = @('locate data\clock-layout.ini') + @(Get-Content -LiteralPath $layout 
 } | ForEach-Object { $_.Substring(5) })
 $sounds = @('idle1', 'idle2', 'smash', 'touch_start', 'touch_end', 'blank1', 'answer', 'alert', 'base_alert')
 $paths += @($sounds | ForEach-Object { "sound\$_.wav" })
-$rc = @('#pragma code_page(65001)', '1 ICON "source\\SkeaClock.ico"')
+$rc = @('#pragma code_page(65001)') + @(Get-Content -LiteralPath (Join-Path $root 'skea-clock.rc') -Encoding UTF8)
 $table = @('struct EmbeddedAsset { int id; const wchar_t* path; };', 'constexpr EmbeddedAsset EmbeddedAssets[] = {')
 $id = 100
 foreach ($relative in ($paths | Select-Object -Unique)) {
@@ -69,7 +70,8 @@ $old = @'
 $new = @'
     std::wstring sourceDirectory;
     if (!PrepareStandalone(settingsPath, sourceDirectory)) {
-        MessageBoxW(nullptr, L"Could not prepare SkeaClock data in LocalAppData. Check free space and folder permissions.", L"Skea clock", MB_OK | MB_ICONERROR);
+        LoadLanguageSettings(settingsPath);
+        MessageBoxW(nullptr, UiText().standaloneDataError, L"Skea clock", MB_OK | MB_ICONERROR);
         CloseHandle(mutex);
         return 1;
     }
@@ -82,7 +84,7 @@ $old = @'
         sourceDirectory = directory + L"..\\source\\";
 '@
 $cpp = Replace-Once $cpp ($old.Replace("`r`n", "`n")) ''
-$cpp = Replace-Once $cpp 'build.cmd를 다시 실행하고, bin 폴더와 source 폴더를 함께 보관해 주세요.' '배포용 EXE를 다시 받거나 사용자 데이터 폴더의 assets 폴더를 지운 뒤 다시 실행해 주세요.'
+$cpp = Replace-Once $cpp 'UiText().artworkLoadHelp' 'UiText().standaloneArtworkLoadHelp'
 Write-Utf8 (Join-Path $work 'skea-clock.cpp') $cpp
 Push-Location -LiteralPath $work
 try {

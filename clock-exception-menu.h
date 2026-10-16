@@ -87,10 +87,10 @@ void AppendTopmostExceptionMenu(HMENU menu) {
     exceptionMenu = CreatePopupMenu();
     exceptionMenuRequested = false;
     topmostExceptionMenuPaths.clear();
-    AppendMenuW(exceptionMenu, MF_STRING | MF_GRAYED, 0, L"(프로그램 없음)");
+    AppendMenuW(exceptionMenu, MF_STRING | MF_GRAYED, 0, UiText().noPrograms);
     AppendMenuW(exceptionMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(exceptionMenu, MF_STRING, TopmostExceptionAdd, L"프로그램 선택...");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(exceptionMenu), L"최상단 고정 예외");
+    AppendMenuW(exceptionMenu, MF_STRING, TopmostExceptionAdd, UiText().programChoose);
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(exceptionMenu), UiText().topmostExceptions);
 }
 
 // Call after DestroyMenu: item bitmaps must outlive the menu that refers to them.
@@ -114,30 +114,9 @@ HBITMAP CreateMenuIconBitmap(const std::wstring& path, UINT dpi) {
     }
     if (!icon) return nullptr;
 
-    const int width = std::max(16, GetSystemMetricsForDpi(SM_CXSMICON, dpi));
-    const int height = std::max(16, GetSystemMetricsForDpi(SM_CYSMICON, dpi));
-    BITMAPINFO bitmapInfo = {};
-    bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bitmapInfo.bmiHeader.biWidth = width;
-    bitmapInfo.bmiHeader.biHeight = -height;
-    bitmapInfo.bmiHeader.biPlanes = 1;
-    bitmapInfo.bmiHeader.biBitCount = 32;
-    bitmapInfo.bmiHeader.biCompression = BI_RGB;
-    void* pixels = nullptr;
-    HDC screen = GetDC(nullptr);
-    HBITMAP bitmap = CreateDIBSection(screen, &bitmapInfo, DIB_RGB_COLORS, &pixels, nullptr, 0);
-    HDC memory = bitmap ? CreateCompatibleDC(screen) : nullptr;
-    if (memory) {
-        HGDIOBJ previous = SelectObject(memory, bitmap);
-        DrawIconEx(memory, 0, 0, icon, width, height, 0, nullptr, DI_NORMAL);
-        SelectObject(memory, previous);
-        DeleteDC(memory);
-    }
-    ReleaseDC(nullptr, screen);
+    HBITMAP bitmap = CreateMenuIconBitmap(icon,
+        std::max(16, GetSystemMetricsForDpi(SM_CXSMICON, dpi)),
+        std::max(16, GetSystemMetricsForDpi(SM_CYSMICON, dpi)));
     if (destroyIcon) DestroyIcon(icon);
-    if (!memory && bitmap) {
-        DeleteObject(bitmap);
-        bitmap = nullptr;
-    }
     return bitmap;
 }

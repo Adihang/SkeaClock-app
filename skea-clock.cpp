@@ -9,6 +9,8 @@
 #include <climits>
 #include <string>
 #include <vector>
+#include "clock-resources.h"
+#include "clock-localization.h"
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shell32.lib")
@@ -18,7 +20,7 @@
 using namespace Gdiplus;
 
 constexpr wchar_t ClassName[] = L"SkeaClockWindow";
-constexpr int AppIconResource = 1;
+constexpr int AppIconResource = SKEA_APP_ICON;
 constexpr UINT TrayMessage = WM_APP + 1;
 constexpr int Background = 101, Ticks = 103, Numbers = 104;
 constexpr int AlwaysOnTop = 105, Exit = 106, EditLayout = 107;
@@ -66,9 +68,9 @@ std::wstring DisplayLabel(const DisplayInfo& display) {
     const size_t number = device.rfind(L"DISPLAY");
     if (number != std::wstring::npos) device = device.substr(number + 7);
     const RECT& rect = display.info.rcMonitor;
-    std::wstring label = L"디스플레이 " + device + L"  (" +
+    std::wstring label = UiText().displayPrefix + device + L"  (" +
         std::to_wstring(rect.right - rect.left) + L" × " + std::to_wstring(rect.bottom - rect.top) + L")";
-    if (display.info.dwFlags & MONITORINFOF_PRIMARY) label += L" · 기본";
+    if (display.info.dwFlags & MONITORINFOF_PRIMARY) label += UiText().displayPrimary;
     return label;
 }
 
@@ -90,7 +92,9 @@ std::wstring FileName(const std::wstring& path) {
 #include "clock-sound.h"
 #include "clock-alarm-validation.h"
 #include "clock-window-behavior.h"
+#include "clock-menu-icons.h"
 #include "clock-exception-menu.h"
+#include "clock-language-menu.h"
 #include "clock-layout-editor.h"
 #include "alarm-editor.h"
 #include "clock-render-buffer.h"
@@ -102,6 +106,7 @@ void SaveSettings() {
     WritePrivateProfileStringW(L"clock", L"numbers", showNumbers ? L"1" : L"0", settingsPath.c_str());
     WritePrivateProfileStringW(L"clock", L"markings", nullptr, settingsPath.c_str());
     WritePrivateProfileStringW(L"clock", L"display", selectedDisplay.c_str(), settingsPath.c_str());
+    WritePrivateProfileStringW(L"clock", L"language", selectedLanguage.c_str(), settingsPath.c_str());
     WritePrivateProfileStringW(L"clock", L"size", nullptr, settingsPath.c_str());
     SaveSoundSettings(settingsPath);
     SaveWindowBehaviorSettings(settingsPath);
@@ -377,7 +382,7 @@ void UpdateClock(HWND window) {
     int step = now.wHour * 3600 + now.wMinute * 60 + now.wSecond;
     if (step == lastStep) return;
     lastStep = step;
-    swprintf_s(tray.szTip, L"Skea clock · %04u-%02u-%02u %02u:%02u\n우클릭: 설정 및 종료",
+    swprintf_s(tray.szTip, UiText().trayTooltip,
         now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute);
     Shell_NotifyIconW(NIM_MODIFY, &tray);
     RenderClock(window);
@@ -395,48 +400,51 @@ HMENU CreateVolumeMenu(int firstCommand, int selectedVolume) {
 
 void AppendSoundMenus(HMENU menu) {
     HMENU effectVolumeMenu = CreateVolumeMenu(EffectVolumeFirst, effectSoundVolume);
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(effectVolumeMenu), L"효과음 크기 조절");
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(effectVolumeMenu), UiText().effectVolume);
 
     HMENU alarmSoundMenu = CreatePopupMenu();
-    AppendMenuW(alarmSoundMenu, MF_STRING, AlarmFileChoose, L"알람 파일 선택...");
+    AppendMenuW(alarmSoundMenu, MF_STRING, AlarmFileChoose, UiText().alarmFileChoose);
     if (!customAlarmSoundPath.empty()) {
         const std::wstring name = FileName(customAlarmSoundPath);
         AppendMenuW(alarmSoundMenu, MF_STRING | (useCustomAlarmSound ? MF_CHECKED : 0),
             AlarmSoundCustom, name.c_str());
     }
     AppendMenuW(alarmSoundMenu, MF_STRING | (!useCustomAlarmSound ? MF_CHECKED : 0),
-        AlarmSoundDefault, L"기본 알람");
+        AlarmSoundDefault, UiText().alarmDefault);
     AppendMenuW(alarmSoundMenu, MF_SEPARATOR, 0, nullptr);
     HMENU alarmVolumeMenu = CreateVolumeMenu(AlarmVolumeFirst, alarmSoundVolume);
-    AppendMenuW(alarmSoundMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(alarmVolumeMenu), L"크기 조절");
-    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(alarmSoundMenu), L"알람 소리 조절");
+    AppendMenuW(alarmSoundMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(alarmVolumeMenu), UiText().volume);
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(alarmSoundMenu), UiText().alarmSound);
 }
 
 void ShowMenu(HWND window, POINT point) {
     DismissAlarm(window);
     if (exceptionMenu) return;
+    MenuIcons icons = { GetDpiForWindow(window), {} };
     HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING | MF_DISABLED, 0, L"Skea clock");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING | (showDial ? MF_CHECKED : 0), Background, L"배경 표시");
-    AppendMenuW(menu, MF_STRING | (showTicks ? MF_CHECKED : 0), Ticks, L"눈금 표시");
-    AppendMenuW(menu, MF_STRING | (showNumbers ? MF_CHECKED : 0), Numbers, L"숫자 표시");
+    AppendMenuW(menu, MF_STRING | (showDial ? MF_CHECKED : 0), Background, UiText().background);
+    AppendMenuW(menu, MF_STRING | (showTicks ? MF_CHECKED : 0), Ticks, UiText().ticks);
+    AppendMenuW(menu, MF_STRING | (showNumbers ? MF_CHECKED : 0), Numbers, UiText().numbers);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, AlarmAddCommand, L"알람 추가");
+    AppendMenuW(menu, MF_STRING, AlarmAddCommand, UiText().alarmAdd);
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_BELL));
     for (size_t i = 0; i < alarms.size(); ++i) {
         HMENU alarmMenu = CreatePopupMenu();
-        AppendMenuW(alarmMenu, MF_STRING, AlarmEditFirst + static_cast<UINT>(i), L"알람 편집");
-        AppendMenuW(alarmMenu, MF_STRING, AlarmDeleteFirst + static_cast<UINT>(i), L"알람 삭제");
+        AppendMenuW(alarmMenu, MF_STRING, AlarmEditFirst + static_cast<UINT>(i), UiText().alarmEdit);
+        AppendMenuW(alarmMenu, MF_STRING, AlarmDeleteFirst + static_cast<UINT>(i), UiText().alarmDelete);
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(alarmMenu), AlarmMenuLabel(alarms[i]).c_str());
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendSoundMenus(menu);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING | (topmost ? MF_CHECKED : 0), AlwaysOnTop, L"항상 위에 표시");
+    AppendMenuW(menu, MF_STRING | (topmost ? MF_CHECKED : 0), AlwaysOnTop, UiText().alwaysOnTop);
     AppendTopmostExceptionMenu(menu);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING | (showTaskbar ? MF_CHECKED : 0), Taskbar, L"작업 표시줄 표시");
-    AppendMenuW(menu, MF_STRING | (layoutEditing ? MF_CHECKED : 0), EditLayout, L"크기·위치 이동");
+    AppendMenuW(menu, MF_STRING | (showTaskbar ? MF_CHECKED : 0), Taskbar, UiText().taskbar);
+    AppendMenuW(menu, MF_STRING | (layoutEditing ? MF_CHECKED : 0), EditLayout, UiText().layout);
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_MOVE));
     HMENU displayMenu = CreatePopupMenu();
     const auto displays = GetDisplays();
     for (size_t i = 0; i < displays.size() && i < MaxDisplays; ++i) {
@@ -444,9 +452,13 @@ void ShowMenu(HWND window, POINT point) {
         AppendMenuW(displayMenu, flags, DisplayFirst + static_cast<UINT>(i), DisplayLabel(displays[i]).c_str());
     }
     AppendMenuW(menu, MF_POPUP | (displays.empty() ? MF_GRAYED : 0),
-        reinterpret_cast<UINT_PTR>(displayMenu), L"표시 디스플레이");
+        reinterpret_cast<UINT_PTR>(displayMenu), UiText().displaySelect);
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_VM));
+    AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(CreateLanguageMenu()), L"Language");
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_GLOBE));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(menu, MF_STRING, Exit, L"종료");
+    AppendMenuW(menu, MF_STRING, Exit, UiText().exit);
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_CLOSE));
     SetForegroundWindow(window);
     int command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
         point.x, point.y, 0, window, nullptr);
@@ -691,6 +703,17 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             }
             return 0;
         }
+        if (LOWORD(wParam) >= LanguageKorean &&
+            LOWORD(wParam) < LanguageKorean + static_cast<int>(std::size(LanguagePacks))) {
+            selectedLanguage = LanguagePacks[LOWORD(wParam) - LanguageKorean].code;
+            SaveSettings();
+            lastStep = -1;
+            if (alarmEditorWindow) {
+                SetWindowTextW(alarmEditorWindow, UiText().alarmAdd);
+                InvalidateRect(alarmEditorWindow, nullptr, TRUE);
+            }
+            return 0;
+        }
         switch (LOWORD(wParam)) {
         case Background: showDial = !showDial; break;
         case Ticks: showTicks = !showTicks; break;
@@ -738,6 +761,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     topmost = GetPrivateProfileIntW(L"clock", L"topmost", 1, settingsPath.c_str()) != 0;
     showTicks = GetPrivateProfileIntW(L"clock", L"ticks", 1, settingsPath.c_str()) != 0;
     showNumbers = GetPrivateProfileIntW(L"clock", L"numbers", 1, settingsPath.c_str()) != 0;
+    LoadLanguageSettings(settingsPath);
     LoadSoundSettings(settingsPath);
     LoadWindowBehaviorSettings(settingsPath);
     wchar_t display[MAX_PATH] = {};
@@ -757,7 +781,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         sourceDirectory = directory + L"..\\source\\";
     SetSoundDirectory(sourceDirectory);
     if (!LoadArtwork(sourceDirectory)) {
-        MessageBoxW(nullptr, L"GIF, 바늘 이미지 또는 locate data의 좌표 설정을 불러오지 못했습니다.\n\nbuild.cmd를 다시 실행하고, bin 폴더와 source 폴더를 함께 보관해 주세요.", L"Skea clock", MB_OK | MB_ICONERROR);
+        const std::wstring error = std::wstring(UiText().artworkLoadError) + L"\n\n" + UiText().artworkLoadHelp;
+        MessageBoxW(nullptr, error.c_str(), L"Skea clock", MB_OK | MB_ICONERROR);
         ReleaseArtwork();
         GdiplusShutdown(token);
         CloseHandle(mutex);
@@ -792,7 +817,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         }
         result = status == -1 ? 1 : static_cast<int>(message.wParam);
     } else {
-        MessageBoxW(nullptr, L"시계 창을 만들지 못했습니다.", L"Skea clock", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, UiText().clockWindowError, L"Skea clock", MB_OK | MB_ICONERROR);
     }
     renderBuffer.Release();
     ReleaseArtwork();

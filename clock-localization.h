@@ -1,0 +1,61 @@
+#pragma once
+#include <iterator>
+
+struct UiStrings {
+    const wchar_t* background;
+    const wchar_t* ticks;
+    const wchar_t* numbers;
+    const wchar_t* alarmAdd;
+    const wchar_t* alarmEdit;
+    const wchar_t* alarmDelete;
+    const wchar_t* effectVolume;
+    const wchar_t* alarmFileChoose;
+    const wchar_t* alarmDefault;
+    const wchar_t* volume;
+    const wchar_t* alarmSound;
+    const wchar_t* alwaysOnTop;
+    const wchar_t* topmostExceptions;
+    const wchar_t* noPrograms;
+    const wchar_t* programChoose;
+    const wchar_t* taskbar;
+    const wchar_t* layout;
+    const wchar_t* displaySelect;
+    const wchar_t* displayPrefix;
+    const wchar_t* displayPrimary;
+    const wchar_t* exit;
+    const wchar_t* alarmDays;
+    const wchar_t* alarmNoDays;
+    const wchar_t* trayTooltip;
+    const wchar_t* alarmFileFilter;
+    const wchar_t* alarmFileTitle;
+    const wchar_t* programFileFilter;
+    const wchar_t* programFileTitle;
+    const wchar_t* mediaPackMissing;
+    const wchar_t* alarmFileError;
+    const wchar_t* artworkLoadError;
+    const wchar_t* artworkLoadHelp;
+    const wchar_t* standaloneArtworkLoadHelp;
+    const wchar_t* clockWindowError;
+    const wchar_t* standaloneDataError;
+};
+
+#include "languages/ko.h"
+#include "languages/ja.h"
+
+struct LanguagePack {
+    const wchar_t* code;
+    const wchar_t* nativeName;
+    const UiStrings& strings;
+};
+
+const LanguagePack LanguagePacks[] = {
+    { L"ko", L"한국어", KoreanStrings },
+    { L"ja", L"日本語", JapaneseStrings },
+};
+std::wstring selectedLanguage = L"ko";
+
+const UiStrings& UiText() {
+    for (const auto& language : LanguagePacks)
+        if (selectedLanguage == language.code) return language.strings;
+    return KoreanStrings;
+}
