@@ -20,6 +20,11 @@ public class AlarmService extends Service {
     return null;
   }
 
+  static boolean stopForClockInteraction(Context context) {
+    if (activeId == -1) return false;
+    return context.getApplicationContext().stopService(new Intent(context, AlarmService.class));
+  }
+
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
     if (intent == null) {

@@ -77,6 +77,7 @@ public class ClockView extends View {
   private boolean alarmView, alarmAlertPlayed;
   private Mode mode = Mode.IDLE;
   private Effects effects;
+  private Runnable interactionListener;
   private final Random random = new Random();
 
   public ClockView(Context context) {
@@ -219,6 +220,14 @@ public class ClockView extends View {
     this.effects = effects;
   }
 
+  void setInteractionListener(Runnable listener) {
+    interactionListener = listener;
+  }
+
+  private void notifyInteraction() {
+    if (interactionListener != null) interactionListener.run();
+  }
+
   void setAlarmRinging(boolean ringing) {
     if (ringing) {
       mode = Mode.PANIC;
@@ -293,6 +302,7 @@ public class ClockView extends View {
 
   private void startSmash(float x, float y) {
     if (mode == Mode.PANIC) return;
+    notifyInteraction();
     mode = Mode.SMASH;
     transitionHandsStarted = false;
     stateStarted = SystemClock.uptimeMillis();
@@ -305,6 +315,7 @@ public class ClockView extends View {
   }
 
   private void startTouch(float x, float y) {
+    notifyInteraction();
     mode = Mode.TOUCH;
     stateStarted = SystemClock.uptimeMillis();
     idleSoundAt = stateStarted + 600;

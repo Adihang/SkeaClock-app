@@ -52,7 +52,9 @@ public class RingActivity extends Activity {
     title.setTextSize(32);
     title.setGravity(Gravity.CENTER);
     box.addView(title);
-    box.addView(new ClockView(this), new LinearLayout.LayoutParams(-1, 0, 1));
+    ClockView clock = new ClockView(this);
+    clock.setInteractionListener(() -> AlarmService.stopForClockInteraction(this));
+    box.addView(clock, new LinearLayout.LayoutParams(-1, 0, 1));
     Button snooze = new Button(this);
     snooze.setText("5분 후 다시 울리기");
     snooze.setOnClickListener(v -> command("SNOOZE"));

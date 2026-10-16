@@ -209,6 +209,7 @@ public class MainActivity extends Activity {
         Store.prefs(this).getBoolean("ticks", true),
         Store.prefs(this).getBoolean("numbers", true));
     clock.setEffects(this::playCharacterSound);
+    clock.setInteractionListener(() -> AlarmService.stopForClockInteraction(this));
     body.addView(clock, new LinearLayout.LayoutParams(-1, dp(300)));
     digital = heading("", 48);
     digital.setGravity(Gravity.CENTER);
