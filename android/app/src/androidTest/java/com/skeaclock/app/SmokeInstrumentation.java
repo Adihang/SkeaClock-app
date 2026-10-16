@@ -57,6 +57,7 @@ public class SmokeInstrumentation extends Instrumentation {
       Scheduler.cancel(c, a.id);
       Store.delete(c, a.id);
       check(Store.alarms(c).isEmpty(), "Delete persisted alarm");
+      checkClockInteractionsStopAlarm(c);
       runOnMainSync(
           () -> {
             RemoteViews views = new RemoteViews(c.getPackageName(), R.layout.widget_clock);
@@ -116,8 +117,8 @@ public class SmokeInstrumentation extends Instrumentation {
           "PASS: persistence, weekly registration, exact alarm delivery, foreground playback"
               + " service, one-shot completion, snooze, restore, delete, RemoteViews AnalogClock"
               + " with 8 dial variants, layered clock face, full-cell touch targets, and API 28+"
-              + " widget idle animation resource, action-first widget frames, and deferred follow-up"
-              + " animation decoding"
+              + " widget idle animation resource, app and widget clock interactions stopping alarms,"
+              + " action-first widget frames, and deferred follow-up animation decoding"
               + (widgetTapBurstChecked
                   ? "; repeated widget taps remain one animation\n"
                   : "; widget tap burst check skipped because no widget is bound\n"));
@@ -183,9 +184,9 @@ public class SmokeInstrumentation extends Instrumentation {
     int[] widgetIds =
         AppWidgetManager.getInstance(context)
             .getAppWidgetIds(new ComponentName(context, ClockWidget.class));
-    if (widgetIds.length == 0) return false;
-
-    int widgetId = widgetIds[0];
+    boolean widgetBound = widgetIds.length > 0;
+    // Exercise the receiver's stop request even on a clean emulator without a pinned widget.
+    int widgetId = widgetBound ? widgetIds[0] : 0x7fff;
     Intent tap =
         new Intent(context, WidgetActionReceiver.class)
             .setAction(WidgetActionReceiver.ACTION_WIDGET_INTERACTION)
@@ -193,7 +194,11 @@ public class SmokeInstrumentation extends Instrumentation {
             .putExtra(WidgetActionReceiver.EXTRA_ACTION, MainActivity.WIDGET_CHEEK)
             .putExtra(WidgetActionReceiver.EXTRA_X, 240f)
             .putExtra(WidgetActionReceiver.EXTRA_Y, 200f);
-    for (int i = 0; i < 10; i++) context.sendBroadcast(new Intent(tap));
+    int alarmId = startImmediateAlarm(context, "Widget interaction alarm");
+    context.sendBroadcast(new Intent(tap));
+    waitForAlarmStopped("Widget cheek-pull action stopped the alarm");
+    check(AlarmService.activeId == -1, "Widget interaction stopped alarm " + alarmId);
+    if (!widgetBound) return false;
 
     long deadline = SystemClock.elapsedRealtime() + 3000;
     Object firstRun = activeRun(widgetId);
@@ -215,6 +220,44 @@ public class SmokeInstrumentation extends Instrumentation {
     SystemClock.sleep(1500);
     check(activeRun(widgetId) == null, "Queued widget taps do not replay after completion");
     return true;
+  }
+
+  private void checkClockInteractionsStopAlarm(Context context) {
+    for (String action : new String[] {MainActivity.WIDGET_BONK, MainActivity.WIDGET_CHEEK}) {
+      int alarmId = startImmediateAlarm(context, "Clock interaction alarm");
+      runOnMainSync(
+          () -> {
+            ClockView clock = new ClockView(context);
+            clock.setInteractionListener(() -> AlarmService.stopForClockInteraction(context));
+            if (MainActivity.WIDGET_BONK.equals(action)) clock.triggerSmash(240, 240);
+            else clock.triggerCheekPull(-1, 0);
+          });
+      waitForAlarmStopped("App clock " + action + " stopped the ringing alarm");
+      check(AlarmService.activeId == -1, "Clock interaction stopped alarm " + alarmId);
+      Scheduler.cancel(context, alarmId);
+      Store.delete(context, alarmId);
+    }
+  }
+
+  private int startImmediateAlarm(Context context, String label) {
+    int alarmId = Store.nextId(context);
+    Alarm alarm = new Alarm(alarmId, 7, 30, 0, true, label);
+    Store.save(context, alarm);
+    check(
+        Scheduler.at(context, alarmId, System.currentTimeMillis() + 1500, false),
+        "Schedule interaction alarm");
+    long deadline = SystemClock.elapsedRealtime() + 10000;
+    while (AlarmService.activeId != alarmId && SystemClock.elapsedRealtime() < deadline)
+      SystemClock.sleep(50);
+    check(AlarmService.activeId == alarmId, "Interaction alarm starts ringing");
+    return alarmId;
+  }
+
+  private void waitForAlarmStopped(String message) {
+    long deadline = SystemClock.elapsedRealtime() + 5000;
+    while (AlarmService.activeId != -1 && SystemClock.elapsedRealtime() < deadline)
+      SystemClock.sleep(25);
+    check(AlarmService.activeId == -1, message);
   }
 
   @SuppressWarnings("unchecked")

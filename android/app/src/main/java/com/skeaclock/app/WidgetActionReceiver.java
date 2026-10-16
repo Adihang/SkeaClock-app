@@ -70,6 +70,8 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
       return;
     }
 
+    AlarmService.stopForClockInteraction(appContext);
+
     // Reserve the widget before posting to the render thread so taps already queued by Android
     // cannot start another animation after the current one finishes.
     boolean reserved;
