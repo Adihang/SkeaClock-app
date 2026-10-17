@@ -23,7 +23,7 @@ function Clear-Work {
 }
 Clear-Work
 New-Item -ItemType Directory -Path $work | Out-Null
-Copy-Item -LiteralPath (Join-Path $root 'skea-clock.cpp'), (Join-Path $root 'prepare-assets.ps1') -Destination $work
+Copy-Item -LiteralPath (Join-Path $root 'skea-clock.cpp'), (Join-Path $root 'prepare-assets.ps1'), (Join-Path $root 'prepare-fxaa.py'), (Join-Path $root 'animation_chunks.py') -Destination $work
 Get-ChildItem -LiteralPath $root -Filter '*.h' -File | Copy-Item -Destination $work
 Copy-Item -LiteralPath (Join-Path $root 'languages') -Destination $work -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'standalone.h') -Destination $work
@@ -41,9 +41,10 @@ Get-ChildItem -LiteralPath $source -Recurse -File | Where-Object {
 & (Join-Path $work 'prepare-assets.ps1')
 $layout = Join-Path $work 'source\locate data\clock-layout.ini'
 $paths = @('locate data\clock-layout.ini') + @(Get-Content -LiteralPath $layout -Encoding Unicode | Where-Object {
-    $_ -match '^file='
-} | ForEach-Object { $_.Substring(5) })
-$sounds = @('idle1', 'idle2', 'smash', 'touch_start', 'touch_end', 'blank1', 'answer', 'alert', 'base_alert')
+    $_ -match '^file\d*='
+} | ForEach-Object { $_.Substring($_.IndexOf('=') + 1) })
+$sounds = @('idle1', 'idle2', 'smash', 'touch_start', 'touch_end', 'touch1', 'touch2', 'touch3',
+    'pat_start', 'pat_end', 'pat1', 'pat2', 'pat3', 'blank1', 'answer', 'smile', 'alert', 'base_alert')
 $paths += @($sounds | ForEach-Object { "sound\$_.wav" })
 $rc = @('#pragma code_page(65001)') + @(Get-Content -LiteralPath (Join-Path $root 'skea-clock.rc') -Encoding UTF8)
 $table = @('struct EmbeddedAsset { int id; const wchar_t* path; };', 'constexpr EmbeddedAsset EmbeddedAssets[] = {')

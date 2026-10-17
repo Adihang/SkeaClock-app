@@ -1,10 +1,14 @@
 #pragma once
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <memory>
 
 constexpr float DialRadius = 108.0f;
 constexpr float TouchRadius = DialRadius * 0.3f;
+constexpr float HeadTouchRadiusX = TouchRadius * 1.5f;
+constexpr float PatWarpRadius = TouchRadius * 3;
+constexpr float PatFollowFraction = 0.15f;
 constexpr float CheekTouchRadius = TouchRadius * 0.6f;
 constexpr float CharacterScale = 0.8f;
 constexpr float HandScale = 0.9f;
@@ -23,6 +27,7 @@ constexpr UINT AlarmHandGatherMs = 100;
 constexpr float AlarmHandTurn = 1.0f / 12.0f;
 
 #include "clock-dial.h"
+#include "clock-animation.h"
 #include "clock-cheek-warp.h"
 
 struct ClockHand {
@@ -30,20 +35,28 @@ struct ClockHand {
     PointF center, tip;
     float nativeAngle = 0;
 };
-std::unique_ptr<Bitmap> gifImage;
-std::unique_ptr<Bitmap> transitionImage;
-std::unique_ptr<Bitmap> smashImage;
-std::unique_ptr<Bitmap> angryImage;
-std::unique_ptr<Bitmap> angryAltImage;
-std::unique_ptr<Bitmap> panicImage;
-std::unique_ptr<Bitmap> blankImage;
-std::unique_ptr<Bitmap> touchBackImage;
-std::unique_ptr<Bitmap> touchHeadImage;
-std::unique_ptr<Bitmap> touchFrontImage;
-std::unique_ptr<Bitmap> touchEndBackImage;
-std::unique_ptr<Bitmap> touchEndHeadImage;
-std::unique_ptr<Bitmap> touchEndFrontImage;
-std::unique_ptr<Bitmap> touchEndImage;
+std::unique_ptr<AnimationImage> gifImage;
+std::unique_ptr<AnimationImage> transitionImage;
+std::unique_ptr<AnimationImage> smashImage;
+std::unique_ptr<AnimationImage> angryImage;
+std::unique_ptr<AnimationImage> angryAltImage;
+std::unique_ptr<AnimationImage> panicImage;
+std::unique_ptr<AnimationImage> blankImage;
+std::unique_ptr<AnimationImage> patIdleImage;
+std::unique_ptr<AnimationImage> patEndImage;
+std::unique_ptr<AnimationImage> touchBackImage;
+std::unique_ptr<AnimationImage> touchHeadImage;
+std::unique_ptr<AnimationImage> touchFrontImage;
+std::unique_ptr<AnimationImage> touchEndBackImage;
+std::unique_ptr<AnimationImage> touchEndHeadImage;
+std::unique_ptr<AnimationImage> touchEndFrontImage;
+std::unique_ptr<AnimationImage> touchEndImage;
+std::array<AnimationImage*, 16> ArtworkAnimations() {
+    return { gifImage.get(), transitionImage.get(), smashImage.get(), angryImage.get(), angryAltImage.get(),
+        panicImage.get(), blankImage.get(), patIdleImage.get(), patEndImage.get(), touchBackImage.get(),
+        touchHeadImage.get(), touchFrontImage.get(), touchEndBackImage.get(), touchEndHeadImage.get(),
+        touchEndFrontImage.get(), touchEndImage.get() };
+}
 ClockHand clockHands[2];
 PointF clockCenter(120, 120);
 PointF smashOffset, angryOffset, angryAltOffset;
@@ -53,6 +66,7 @@ PointF touchHeadOffset, touchFrontOffset;
 PointF touchEndHeadOffset, touchEndFrontOffset;
 PointF cheekTouchSource;
 PointF cheekPull;
+PointF patPull;
 PointF touchReleasePullSource;
 PointF touchReleaseWarpCenter;
 float touchWarpBaseRadius = 0;
@@ -66,6 +80,8 @@ std::vector<UINT> angryAltSourceFrameEnds;
 std::vector<UINT> angryAltFrameEnds;
 std::vector<UINT> panicFrameEnds;
 std::vector<UINT> blankFrameEnds;
+std::vector<UINT> patIdleFrameEnds;
+std::vector<UINT> patEndFrameEnds;
 std::vector<UINT> touchFrameEnds;
 std::vector<UINT> touchEndFrameEnds;
 std::vector<PointF> frameCenters;
@@ -83,27 +99,16 @@ bool touchReleaseActive = false;
 bool alarmActive = false;
 bool alarmPanicActive = false;
 bool blankPlaybackActive = false;
+bool patActive = false;
+bool patReleaseActive = false;
 ULONGLONG handReturnStart = 0;
 float handReturnStartTurns[2] = { .5f, .5f };
 float alarmHandStartTurns[2] = {};
 float handReturnStartLengthScales[2] = { 1.0f, 1.0f };
 float alarmHandStartLengthScales[2] = { 1.0f, 1.0f };
 
-bool ReadFrameEnds(Bitmap& image, std::vector<UINT>& ends) {
-    const UINT count = image.GetFrameCount(&FrameDimensionTime);
-    const UINT bytes = image.GetPropertyItemSize(PropertyTagFrameDelay);
-    std::vector<BYTE> storage(bytes);
-    auto delays = reinterpret_cast<PropertyItem*>(storage.data());
-    if (!bytes || image.GetPropertyItem(PropertyTagFrameDelay, bytes, delays) != Ok ||
-        delays->type != PropertyTagTypeLong || delays->length / sizeof(ULONG) < count) return false;
-    ends.clear();
-    UINT duration = 0;
-    for (UINT i = 0; i < count; ++i) {
-        const ULONG delay = static_cast<ULONG*>(delays->value)[i];
-        if (delay > 60000 || duration > MAXUINT - std::max(1UL, delay) * 10) return false;
-        duration += std::max(1UL, delay) * 10;
-        ends.push_back(duration);
-    }
+bool ReadFrameEnds(AnimationImage& image, std::vector<UINT>& ends) {
+    ends = image.frameEnds;
     return !ends.empty();
 }
 
@@ -141,6 +146,8 @@ void ReleaseArtwork() {
     angryAltImage.reset();
     panicImage.reset();
     blankImage.reset();
+    patIdleImage.reset();
+    patEndImage.reset();
     touchBackImage.reset();
     touchHeadImage.reset();
     touchFrontImage.reset();
@@ -157,6 +164,8 @@ void ReleaseArtwork() {
     angryAltFrameEnds.clear();
     panicFrameEnds.clear();
     blankFrameEnds.clear();
+    patIdleFrameEnds.clear();
+    patEndFrameEnds.clear();
     touchFrameEnds.clear();
     touchEndFrameEnds.clear();
     frameCenters.clear();
@@ -172,6 +181,7 @@ void ReleaseArtwork() {
     alarmActive = false;
     alarmPanicActive = false;
     blankPlaybackActive = false;
+    patActive = patReleaseActive = false;
     smashOffset = PointF();
     angryOffset = PointF();
     angryAltOffset = PointF();
@@ -183,6 +193,7 @@ void ReleaseArtwork() {
     touchEndFrontOffset = PointF();
     cheekTouchSource = PointF();
     cheekPull = PointF();
+    patPull = PointF();
     touchReleasePullSource = PointF();
     touchReleaseWarpCenter = PointF();
     touchWarpBaseRadius = 0;
@@ -201,45 +212,32 @@ bool LoadArtwork(const std::wstring& directory) {
     auto point = [&](const wchar_t* section, const wchar_t* x, const wchar_t* y) {
         return PointF(read(section, x) + .5f, read(section, y) + .5f);
     };
-    auto valid = [](PointF p, Bitmap& image) {
+    auto valid = [](PointF p, auto& image) {
         return p.X >= .5f && p.Y >= .5f && p.X < image.GetWidth() && p.Y < image.GetHeight();
     };
-    const std::wstring gifPath = readString(L"background", L"file");
-    if (gifPath.empty()) return false;
-    gifImage.reset(Bitmap::FromFile((directory + gifPath).c_str()));
-    if (!gifImage || gifImage->GetLastStatus() != Ok) return false;
-    const std::wstring touchFile = readString(L"touch", L"file");
-    if (touchFile.empty()) return false;
-    transitionImage.reset(Bitmap::FromFile((directory + touchFile).c_str()));
-    if (!transitionImage || transitionImage->GetLastStatus() != Ok ||
-        read(L"touch", L"width") != static_cast<int>(transitionImage->GetWidth()) ||
-        read(L"touch", L"height") != static_cast<int>(transitionImage->GetHeight())) return false;
-    cheekTouchSource = point(L"touch", L"x", L"y");
-    if (!valid(cheekTouchSource, *transitionImage)) return false;
-    auto loadAligned = [&](const wchar_t* section, std::unique_ptr<Bitmap>& image, PointF& offset) {
-        const std::wstring file = readString(section, L"file");
-        const int x = GetPrivateProfileIntW(section, L"offsetX", INT_MAX, config.c_str());
-        const int y = GetPrivateProfileIntW(section, L"offsetY", INT_MAX, config.c_str());
-        if (file.empty() || x == INT_MAX || y == INT_MAX) return false;
-        image.reset(Bitmap::FromFile((directory + file).c_str()));
-        if (!image || image->GetLastStatus() != Ok ||
-            read(section, L"width") != static_cast<int>(image->GetWidth()) ||
-            read(section, L"height") != static_cast<int>(image->GetHeight())) return false;
-        offset = PointF(static_cast<float>(x), static_cast<float>(y));
-        return true;
-    };
-    auto loadImage = [&](const wchar_t* section, std::unique_ptr<Bitmap>& image) {
+    auto loadImage = [&](const wchar_t* section, std::unique_ptr<AnimationImage>& image) {
         const std::wstring file = readString(section, L"file");
         if (file.empty()) return false;
-        image.reset(Bitmap::FromFile((directory + file).c_str()));
-        return image && image->GetLastStatus() == Ok &&
+        image = std::make_unique<AnimationImage>();
+        return image->Load(directory, config, section) &&
             read(section, L"width") == static_cast<int>(image->GetWidth()) &&
             read(section, L"height") == static_cast<int>(image->GetHeight());
+    };
+    if (!loadImage(L"background", gifImage) || !loadImage(L"touch", transitionImage)) return false;
+    cheekTouchSource = point(L"touch", L"x", L"y");
+    if (!valid(cheekTouchSource, *transitionImage)) return false;
+    auto loadAligned = [&](const wchar_t* section, std::unique_ptr<AnimationImage>& image, PointF& offset) {
+        const int x = GetPrivateProfileIntW(section, L"offsetX", INT_MAX, config.c_str());
+        const int y = GetPrivateProfileIntW(section, L"offsetY", INT_MAX, config.c_str());
+        if (x == INT_MAX || y == INT_MAX || !loadImage(section, image)) return false;
+        offset = PointF(static_cast<float>(x), static_cast<float>(y));
+        return true;
     };
     if (!loadAligned(L"smash", smashImage, smashOffset) || !loadAligned(L"angry", angryImage, angryOffset) ||
         !loadAligned(L"angry_alt", angryAltImage, angryAltOffset) ||
         !loadAligned(L"panic", panicImage, panicOffset) ||
         !loadAligned(L"blank", blankImage, blankOffset) ||
+        !loadImage(L"pat_idle", patIdleImage) || !loadImage(L"pat_end", patEndImage) ||
         !loadImage(L"touch_back", touchBackImage) ||
         !loadAligned(L"touch_head", touchHeadImage, touchHeadOffset) ||
         !loadAligned(L"touch_front", touchFrontImage, touchFrontOffset) ||
@@ -250,7 +248,7 @@ bool LoadArtwork(const std::wstring& directory) {
     const int touchWarpFrameCount = read(L"touch_head", L"frameCount");
     touchWarpBaseRadius = static_cast<float>(read(L"touch_head", L"radius"));
     if (touchWarpFrameCount <= 0 || touchWarpBaseRadius <= 0 ||
-        touchWarpFrameCount != static_cast<int>(touchHeadImage->GetFrameCount(&FrameDimensionTime))) return false;
+        touchWarpFrameCount != static_cast<int>(touchHeadImage->GetFrameCount())) return false;
     touchWarpCenters.clear();
     for (int i = 0; i < touchWarpFrameCount; ++i) {
         const std::wstring key = L"frame" + std::to_wstring(i);
@@ -265,7 +263,7 @@ bool LoadArtwork(const std::wstring& directory) {
     const int frameCount = read(L"background", L"frameCount");
     if (read(L"background", L"width") != static_cast<int>(gifImage->GetWidth()) ||
         read(L"background", L"height") != static_cast<int>(gifImage->GetHeight()) || frameCount <= 0 ||
-        frameCount != static_cast<int>(gifImage->GetFrameCount(&FrameDimensionTime))) return false;
+        frameCount != static_cast<int>(gifImage->GetFrameCount())) return false;
 
     frameCenters.clear();
     float left = -DialRadius, top = -DialRadius, right = DialRadius, bottom = DialRadius;
@@ -306,6 +304,10 @@ bool LoadArtwork(const std::wstring& directory) {
     clockCenter = PointF(margin - left, margin - top);
     artworkWidth = static_cast<int>(std::ceil(right - left + margin * 2));
     artworkHeight = static_cast<int>(std::ceil(bottom - top + margin * 2));
+#ifdef SKEA_TEST_BUILD
+    artworkWidth += TestPanelWidth;
+    clockCenter.X += TestPanelWidth;
+#endif
 
     std::vector<UINT> touchHeadFrameEnds, touchFrontFrameEnds;
     std::vector<UINT> touchEndBackFrameEnds, touchEndHeadFrameEnds, touchEndFrontFrameEnds;
@@ -313,6 +315,7 @@ bool LoadArtwork(const std::wstring& directory) {
         !ReadFrameEnds(*smashImage, smashFrameEnds) || !ReadFrameEnds(*angryImage, angryFrameEnds) ||
         !ReadFrameEnds(*angryAltImage, angryAltSourceFrameEnds) || !ReadFrameEnds(*panicImage, panicFrameEnds) ||
         !ReadFrameEnds(*blankImage, blankFrameEnds) ||
+        !ReadFrameEnds(*patIdleImage, patIdleFrameEnds) || !ReadFrameEnds(*patEndImage, patEndFrameEnds) ||
         !ReadFrameEnds(*touchBackImage, touchFrameEnds) ||
         !ReadFrameEnds(*touchHeadImage, touchHeadFrameEnds) || !ReadFrameEnds(*touchFrontImage, touchFrontFrameEnds) ||
         !ReadFrameEnds(*touchEndImage, touchEndFrameEnds) ||
@@ -344,25 +347,31 @@ bool LoadArtwork(const std::wstring& directory) {
     alarmActive = false;
     alarmPanicActive = false;
     blankPlaybackActive = false;
+    patActive = patReleaseActive = false;
     cheekPull = PointF();
     touchReleasePullSource = PointF();
     touchReleaseWarpCenter = PointF();
     clockDial = std::make_unique<ClockDial>();
     if (!clockDial->Initialize(clockCenter)) return false;
-    return gifImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        transitionImage->SelectActiveFrame(&FrameDimensionTime, TransitionStartFrame) == Ok &&
-        smashImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        angryImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        angryAltImage->SelectActiveFrame(&FrameDimensionTime, AngryAltStartFrame) == Ok &&
-        panicImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        blankImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchBackImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchHeadImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchFrontImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchEndBackImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchEndHeadImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok &&
-        touchEndImage->SelectActiveFrame(&FrameDimensionTime, TouchBounceFrameCount) == Ok &&
-        touchEndFrontImage->SelectActiveFrame(&FrameDimensionTime, 0) == Ok;
+    for (AnimationImage* image : ArtworkAnimations()) {
+        if (!image->Preload(image == gifImage.get() ? IdleReturnFrame : UINT_MAX)) return false;
+    }
+    return gifImage->SelectFrame(0) == Ok &&
+        transitionImage->SelectFrame(TransitionStartFrame) == Ok &&
+        smashImage->SelectFrame(SmashStartFrame) == Ok &&
+        angryImage->SelectFrame(0) == Ok &&
+        angryAltImage->SelectFrame(AngryAltStartFrame) == Ok &&
+        panicImage->SelectFrame(0) == Ok &&
+        blankImage->SelectFrame(0) == Ok &&
+        patIdleImage->SelectFrame(0) == Ok &&
+        patEndImage->SelectFrame(0) == Ok &&
+        touchBackImage->SelectFrame(0) == Ok &&
+        touchHeadImage->SelectFrame(0) == Ok &&
+        touchFrontImage->SelectFrame(0) == Ok &&
+        touchEndBackImage->SelectFrame(0) == Ok &&
+        touchEndHeadImage->SelectFrame(0) == Ok &&
+        touchEndImage->SelectFrame(TouchBounceFrameCount) == Ok &&
+        touchEndFrontImage->SelectFrame(0) == Ok && gifImage->Frame() != nullptr;
 }
 
 UINT FrameAt(const std::vector<UINT>& ends, ULONGLONG elapsed) {
@@ -432,10 +441,12 @@ PointF ClampedCheekPull(PointF mouse) {
     return PointF(dx, dy);
 }
 
-Bitmap* CurrentGif() {
+AnimationImage* CurrentGif() {
     if (touchReleaseActive && activeFrame >= TouchBounceFrameCount) return touchEndImage.get();
     if (alarmActive && alarmPanicActive) return panicImage.get();
     if (blankPlaybackActive) return blankImage.get();
+    if (patActive) return patIdleImage.get();
+    if (patReleaseActive) return patEndImage.get();
     if (!reactionActive) return gifImage.get();
     if (showingTransition) return transitionImage.get();
     if (showingAngryAlt) return angryAltImage.get();
@@ -472,6 +483,7 @@ void BeginAlarm(const SYSTEMTIME& now) {
     for (int i = 0; i < 2; ++i) alarmHandStartLengthScales[i] = HandLengthScale(i, tick);
     cheekWarpBuffers.Release();
     blankPlaybackActive = false;
+    patActive = patReleaseActive = false;
     reactionActive = false;
     showingAngry = false;
     showingAngryAlt = false;
@@ -487,11 +499,12 @@ void BeginAlarm(const SYSTEMTIME& now) {
     activeFrame = 0;
     animationStart = tick;
     idlePhaseOffset = 0;
-    gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    gifImage->SelectFrame(0);
 }
 
 void BeginBlankPlayback() {
     cheekWarpBuffers.Release();
+    patActive = patReleaseActive = false;
     alarmActive = false;
     alarmPanicActive = false;
     reactionActive = false;
@@ -505,7 +518,7 @@ void BeginBlankPlayback() {
     blankPlaybackActive = true;
     activeFrame = 0;
     animationStart = GetTickCount64();
-    blankImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    blankImage->SelectFrame(0);
 }
 
 void EndBlankPlayback() {
@@ -514,7 +527,7 @@ void EndBlankPlayback() {
     activeFrame = 0;
     animationStart = GetTickCount64();
     idlePhaseOffset = 0;
-    gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    gifImage->SelectFrame(0);
 }
 
 void DismissAlarmToIdle() {
@@ -526,7 +539,7 @@ void DismissAlarmToIdle() {
     animationStart = tick;
     idlePhaseOffset = 0;
     activeFrame = 0;
-    gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    gifImage->SelectFrame(0);
     handReturnActive = true;
     handReturnStartTurns[0] = handReturnStartTurns[1] = AlarmHandTurn;
     handReturnStart = animationStart;
@@ -534,6 +547,7 @@ void DismissAlarmToIdle() {
 
 void BeginReaction() {
     cheekWarpBuffers.Release();
+    patActive = patReleaseActive = false;
     blankPlaybackActive = false;
     alarmActive = false;
     alarmPanicActive = false;
@@ -547,11 +561,12 @@ void BeginReaction() {
     handReturnActive = false;
     activeFrame = SmashStartFrame;
     animationStart = GetTickCount64();
-    smashImage->SelectActiveFrame(&FrameDimensionTime, SmashStartFrame);
+    smashImage->SelectFrame(SmashStartFrame);
 }
 
 void BeginCheekPull() {
     cheekWarpBuffers.Release();
+    patActive = patReleaseActive = false;
     blankPlaybackActive = false;
     alarmActive = false;
     alarmPanicActive = false;
@@ -565,22 +580,54 @@ void BeginCheekPull() {
     cheekPull = PointF();
     activeFrame = 0;
     animationStart = GetTickCount64();
-    touchBackImage->SelectActiveFrame(&FrameDimensionTime, 0);
-    touchHeadImage->SelectActiveFrame(&FrameDimensionTime, 0);
-    touchFrontImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    touchBackImage->SelectFrame(0);
+    touchHeadImage->SelectFrame(0);
+    touchFrontImage->SelectFrame(0);
+}
+
+void BeginPat() {
+    cheekWarpBuffers.Release();
+    patPull = PointF();
+    blankPlaybackActive = false;
+    alarmActive = alarmPanicActive = false;
+    reactionActive = showingAngry = showingAngryAlt = showingTransition = false;
+    cheekDragging = touchReleaseActive = false;
+    cheekPull = PointF();
+    handReturnActive = false;
+    patActive = true;
+    patReleaseActive = false;
+    activeFrame = 0;
+    animationStart = GetTickCount64();
+    idlePhaseOffset = 0;
+    patIdleImage->SelectFrame(0);
+}
+
+void EndPat() {
+    if (!patActive) return;
+    cheekWarpBuffers.Release();
+    patPull = PointF();
+    patActive = false;
+    patReleaseActive = true;
+    activeFrame = 0;
+    animationStart = GetTickCount64();
+    patEndImage->SelectFrame(0);
 }
 
 PointF EffectiveCheekWarpPull();
 
+bool SelectLayerFrames(UINT frame, AnimationImage& back, AnimationImage& head, AnimationImage& front) {
+    const bool backReady = back.Ready(frame), headReady = head.Ready(frame), frontReady = front.Ready(frame);
+    if (!backReady || !headReady || !frontReady) return false;
+    return back.SelectFrame(frame) == Ok && head.SelectFrame(frame) == Ok && front.SelectFrame(frame) == Ok;
+}
+
 bool SelectTouchReleaseFrame(UINT frame) {
     if (frame >= TouchBounceFrameCount) {
-        if (touchEndImage->SelectActiveFrame(&FrameDimensionTime, frame) != Ok) return false;
+        if (touchEndImage->SelectFrame(frame) != Ok) return false;
         cheekWarpBuffers.Release();
         return true;
     }
-    return touchEndBackImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok &&
-        touchEndHeadImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok &&
-        touchEndFrontImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok;
+    return SelectLayerFrames(frame, *touchEndBackImage, *touchEndHeadImage, *touchEndFrontImage);
 }
 
 void EndCheekPull() {
@@ -595,9 +642,9 @@ void EndCheekPull() {
     activeFrame = 0;
     animationStart = GetTickCount64();
     handReturnActive = false;
-    touchEndBackImage->SelectActiveFrame(&FrameDimensionTime, 0);
-    touchEndHeadImage->SelectActiveFrame(&FrameDimensionTime, 0);
-    touchEndFrontImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    touchEndBackImage->SelectFrame(0);
+    touchEndHeadImage->SelectFrame(0);
+    touchEndFrontImage->SelectFrame(0);
 }
 
 float TouchReleasePullScale(UINT frame) {
@@ -619,10 +666,10 @@ void CompleteTouchRelease(ULONGLONG now) {
     handReturnStartTurns[0] = handReturnStartTurns[1] = .5f;
     handReturnStartLengthScales[0] = handReturnStartLengthScales[1] = 1.0f;
     handReturnStart = now;
-    gifImage->SelectActiveFrame(&FrameDimensionTime, 0);
+    gifImage->SelectFrame(0);
 }
 
-PointF AnimationPosition(Bitmap& image) {
+PointF AnimationPosition(AnimationImage& image) {
     const PointF idle = GifPosition();
     PointF offset;
     if (&image == smashImage.get()) offset = smashOffset;
@@ -719,16 +766,14 @@ PointF EffectiveCheekWarpPull() {
     return pull;
 }
 
-Bitmap* WarpedHead(Bitmap& back, Bitmap& head, PointF headOffset,
-    PointF warpCenter, PointF effectivePull) {
-    const UINT width = back.GetWidth(), height = back.GetHeight();
-    if (!cheekWarpBuffers.Prepare(back, head, headOffset, activeFrame)) return nullptr;
+Bitmap* WarpedHead(UINT width, UINT height, Bitmap& head, PointF headOffset,
+    PointF warpCenter, PointF effectivePull, float warpRadius, bool radial) {
+    if (!cheekWarpBuffers.Prepare(width, height, head, headOffset, activeFrame)) return nullptr;
     Bitmap* source = cheekWarpBuffers.source.get();
     Bitmap* result = cheekWarpBuffers.result.get();
     float pullX = effectivePull.X, pullY = effectivePull.Y;
     if (std::hypot(pullX, pullY) < .01f) return source;
     const float warpCenterX = warpCenter.X - .5f, warpCenterY = warpCenter.Y - .5f;
-    const float warpRadius = touchWarpBaseRadius;
     {
         Graphics graphics(result);
         graphics.Clear(Color(0, 0, 0, 0));
@@ -747,7 +792,7 @@ Bitmap* WarpedHead(Bitmap& back, Bitmap& head, PointF headOffset,
         const BYTE* row = static_cast<const BYTE*>(sourceData.Scan0) + y * sourceData.Stride;
         return row[x * 4 + channel];
     };
-    if (pullX <= 0 || std::abs(pullY) > .01f) {
+    if (!radial && (pullX <= 0 || std::abs(pullY) > .01f)) {
         for (int y = std::max(0, static_cast<int>(std::floor(warpCenterY - warpRadius)));
             y <= std::min(static_cast<int>(height) - 1, static_cast<int>(std::ceil(warpCenterY + warpRadius))); ++y) {
             const float vertical = (y - warpCenterY) / warpRadius;
@@ -768,7 +813,13 @@ Bitmap* WarpedHead(Bitmap& back, Bitmap& head, PointF headOffset,
     for (int row = 0; row <= Rows; ++row) {
         for (int column = 0; column <= Columns; ++column) {
             const PointF point = cheekWarpBuffers.original[row][column];
-            const float weight = cheekWarpGrid.weight[row][column];
+            float weight = cheekWarpGrid.weight[row][column];
+            if (radial) {
+                const float dx = (point.X - warpCenterX) / warpRadius;
+                const float dy = (point.Y - warpCenterY) / warpRadius;
+                const float falloff = std::max(0.0f, 1 - dx * dx - dy * dy);
+                weight = falloff * falloff;
+            }
             mesh[row][column] = { point.X + pullX * weight, point.Y + pullY * weight, point.X, point.Y };
         }
     }
@@ -803,7 +854,7 @@ Bitmap* WarpedHead(Bitmap& back, Bitmap& head, PointF headOffset,
                     const float lower = pixel(left, top + 1, channel) * (1 - fx) + pixel(left + 1, top + 1, channel) * fx;
                     sample[channel] = std::clamp(upper * (1 - fy) + lower * fy, 0.0f, 255.0f);
                 }
-                const float remaining = 1 - sample[3] / 255.0f;
+                const float remaining = radial ? 0.0f : 1 - sample[3] / 255.0f;
                 for (int channel = 0; channel < 4; ++channel)
                     output[x * 4 + channel] = static_cast<BYTE>(std::clamp(
                         sample[channel] + output[x * 4 + channel] * remaining, 0.0f, 255.0f));
@@ -820,18 +871,37 @@ Bitmap* WarpedHead(Bitmap& back, Bitmap& head, PointF headOffset,
 }
 
 Bitmap* WarpedTouchHead() {
-    return WarpedHead(*touchBackImage, *touchHeadImage, touchHeadOffset,
-        TouchWarpCenterSource(), EffectiveCheekWarpPull());
+    Bitmap* head = touchHeadImage->Frame();
+    if (!head) return nullptr;
+    const PointF crop = touchHeadImage->FrameOffset();
+    return WarpedHead(touchBackImage->GetWidth(), touchBackImage->GetHeight(), *head,
+        PointF(touchHeadOffset.X + crop.X, touchHeadOffset.Y + crop.Y),
+        TouchWarpCenterSource(), EffectiveCheekWarpPull(), touchWarpBaseRadius, false);
 }
 
 Bitmap* WarpedTouchEndHead() {
     const float scale = TouchReleasePullScale(activeFrame);
-    return WarpedHead(*touchEndBackImage, *touchEndHeadImage, touchEndHeadOffset,
+    Bitmap* head = touchEndHeadImage->Frame();
+    if (!head) return nullptr;
+    const PointF crop = touchEndHeadImage->FrameOffset();
+    return WarpedHead(touchEndBackImage->GetWidth(), touchEndBackImage->GetHeight(), *head,
+        PointF(touchEndHeadOffset.X + crop.X, touchEndHeadOffset.Y + crop.Y),
         touchReleaseWarpCenter, PointF(touchReleasePullSource.X * scale,
-            touchReleasePullSource.Y * scale));
+            touchReleasePullSource.Y * scale), touchWarpBaseRadius, false);
 }
 
+#include "clock-pat-warp.h"
+
 void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTicks, bool drawNumbers) {
+    const bool endingTouch = touchReleaseActive && activeFrame < TouchBounceFrameCount;
+    AnimationImage* primary = cheekDragging || endingTouch ? nullptr : CurrentGif();
+    for (AnimationImage* image : ArtworkAnimations()) {
+        const bool touchLayer = cheekDragging && (image == touchBackImage.get() ||
+            image == touchHeadImage.get() || image == touchFrontImage.get());
+        const bool endLayer = endingTouch && (image == touchEndBackImage.get() ||
+            image == touchEndHeadImage.get() || image == touchEndFrontImage.get());
+        image->SetActive(image == primary || touchLayer || endLayer);
+    }
     auto& dial = *clockDial;
     if (drawDial) g.FillEllipse(&dial.background, clockCenter.X - DialRadius, clockCenter.Y - DialRadius, DialRadius * 2, DialRadius * 2);
     g.SetInterpolationMode(InterpolationModeBilinear);
@@ -845,16 +915,33 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
                 image.GetWidth() * CharacterScale, image.GetHeight() * CharacterScale),
                 0, 0, static_cast<float>(image.GetWidth()), static_cast<float>(image.GetHeight()), UnitPixel);
         };
-        drawLayer(cheekDragging ? *touchBackImage : *touchEndBackImage, PointF());
-        if (head) drawLayer(*head, PointF());
-        drawLayer(cheekDragging ? *touchFrontImage : *touchEndFrontImage,
-            cheekDragging ? touchFrontOffset : touchEndFrontOffset);
+        AnimationImage& back = cheekDragging ? *touchBackImage : *touchEndBackImage;
+        AnimationImage& front = cheekDragging ? *touchFrontImage : *touchEndFrontImage;
+        const PointF frontOffset = cheekDragging ? touchFrontOffset : touchEndFrontOffset;
+        Bitmap* composite = cheekWarpBuffers.ComposeLayers(back, head, front, frontOffset);
+        if (composite) {
+            drawLayer(*composite, cheekWarpBuffers.compositeOffset);
+        } else {
+            if (Bitmap* image = back.Frame()) drawLayer(*image, back.FrameOffset());
+            if (head) drawLayer(*head, PointF());
+            const PointF crop = front.FrameOffset();
+            if (Bitmap* image = front.Frame()) drawLayer(*image, PointF(frontOffset.X + crop.X, frontOffset.Y + crop.Y));
+        }
     } else {
-        Bitmap* animation = CurrentGif();
+        AnimationImage* animation = CurrentGif();
         const PointF position = AnimationPosition(*animation);
-        g.DrawImage(animation, RectF(position.X, position.Y, animation->GetWidth() * CharacterScale,
-            animation->GetHeight() * CharacterScale), 0, 0, static_cast<float>(animation->GetWidth()),
-            static_cast<float>(animation->GetHeight()), UnitPixel);
+        Bitmap* image = animation->Frame();
+        PointF crop = animation->FrameOffset();
+        if (patActive) {
+            Bitmap* warped = WarpedPatImage();
+            if (warped) {
+                image = warped;
+                crop = PointF();
+            }
+        }
+        if (image) g.DrawImage(image, RectF(position.X + crop.X * CharacterScale, position.Y + crop.Y * CharacterScale,
+            image->GetWidth() * CharacterScale, image->GetHeight() * CharacterScale),
+            0, 0, static_cast<float>(image->GetWidth()), static_cast<float>(image->GetHeight()), UnitPixel);
     }
     g.Restore(clipState);
     for (int i = 0; i < 60; ++i) {
@@ -892,7 +979,8 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
             auto& hand = clockHands[i];
             GraphicsState state = g.Save();
             Matrix transform;
-            const bool idleHandCenter = CurrentGif() == gifImage.get() && activeFrame < frameCenters.size();
+            const bool idleHandCenter = (CurrentGif() == gifImage.get() || patReleaseActive) &&
+                activeFrame < frameCenters.size();
             const bool transitionHandCenter = CurrentGif() == transitionImage.get() &&
                 activeFrame < transitionSourceFrameEnds.size();
             Matrix fixedTipTransform;
@@ -904,7 +992,8 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
                 fixedTip.X = clockCenter.X + (fixedTip.X - clockCenter.X) * lengthScale;
                 fixedTip.Y = clockCenter.Y + (fixedTip.Y - clockCenter.Y) * lengthScale;
             }
-            const PointF movingCenter = idleHandCenter ? IdleHandCenter(activeFrame) :
+            const PointF movingCenter = patActive ? PointF(clockCenter.X + patPull.X, clockCenter.Y + patPull.Y) :
+                idleHandCenter ? IdleHandCenter(activeFrame) :
                 transitionHandCenter ? TransitionHandCenter(activeFrame) : clockCenter;
             StretchedHandTransform(transform, hand, movingCenter, fixedTip);
             g.MultiplyTransform(&transform);

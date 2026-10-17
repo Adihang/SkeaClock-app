@@ -19,7 +19,13 @@
 
 using namespace Gdiplus;
 
+#ifdef SKEA_TEST_BUILD
+constexpr wchar_t ClassName[] = L"SkeaClockTestWindow";
+constexpr wchar_t InstanceMutexName[] = L"Local\\SkeaClock.Test.SingleInstance";
+#else
 constexpr wchar_t ClassName[] = L"SkeaClockWindow";
+constexpr wchar_t InstanceMutexName[] = L"Local\\SkeaClock.SingleInstance";
+#endif
 constexpr int AppIconResource = SKEA_APP_ICON;
 constexpr UINT TrayMessage = WM_APP + 1;
 constexpr int Background = 101, Ticks = 103, Numbers = 104;
@@ -87,8 +93,12 @@ std::wstring FileName(const std::wstring& path) {
     return separator == std::wstring::npos ? path : path.substr(separator + 1);
 }
 
+#ifdef SKEA_TEST_BUILD
+#include "clock-head-debug.h"
+#endif
 #include "clock-artwork.h"
 #include "clock-smash-effect.h"
+#include "clock-pat-heart-effect.h"
 #include "clock-sound.h"
 #include "clock-alarm-validation.h"
 #include "clock-window-behavior.h"
@@ -98,6 +108,10 @@ std::wstring FileName(const std::wstring& path) {
 #include "clock-layout-editor.h"
 #include "alarm-editor.h"
 #include "clock-render-buffer.h"
+
+#ifdef SKEA_TEST_BUILD
+void DrawHeadPressRange(Graphics& graphics);
+#endif
 
 void SaveSettings() {
     WritePrivateProfileStringW(L"clock", L"background", showDial ? L"1" : L"0", settingsPath.c_str());
@@ -127,7 +141,24 @@ void RenderClock(HWND window) {
         GetLocalTime(&now);
         DrawArtwork(g, now, showDial, showTicks, showNumbers);
         DrawSmashStarEffect(g);
+        DrawPatHeartEffect(g);
+#ifdef SKEA_TEST_BUILD
+        Pen patArea(Color(220, 40, 190, 110), 1.5f);
+        g.DrawEllipse(&patArea, clockCenter.X - PatWarpRadius, clockCenter.Y - PatWarpRadius,
+            PatWarpRadius * 2, PatWarpRadius * 2);
+        SolidBrush headTouch(Color(80, 255, 90, 90));
+        g.FillEllipse(&headTouch, clockCenter.X - HeadTouchRadiusX, clockCenter.Y - TouchRadius,
+            HeadTouchRadiusX * 2, TouchRadius * 2);
+        const PointF cheek = CheekTouchCenter();
+        SolidBrush cheekTouch(Color(80, 70, 160, 255));
+        g.FillEllipse(&cheekTouch, cheek.X - CheekTouchRadius, cheek.Y - CheekTouchRadius,
+            CheekTouchRadius * 2, CheekTouchRadius * 2);
+        DrawTestAlarmButton(g);
+#endif
         g.ResetTransform();
+#ifdef SKEA_TEST_BUILD
+        DrawHeadPressRange(g);
+#endif
         DrawLayoutEditor(g, width, height);
         g.Flush(FlushIntentionSync);
     }
@@ -155,12 +186,12 @@ void AnimateBackground(HWND window) {
             animationStart = now;
             elapsed = 0;
             activeFrame = 0;
-            panicImage->SelectActiveFrame(&FrameDimensionTime, 0);
+            panicImage->SelectFrame(0);
             PlaySoundFile(L"alert.wav");
             RenderClock(window);
         }
         const UINT frame = FrameAt(panicFrameEnds, elapsed);
-        if (frame != activeFrame && panicImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok) {
+        if (frame != activeFrame && panicImage->SelectFrame(frame) == Ok) {
             activeFrame = frame;
             RenderClock(window);
         }
@@ -185,10 +216,7 @@ void AnimateBackground(HWND window) {
     }
     if (cheekDragging) {
         const UINT frame = FrameAt(touchFrameEnds, elapsed);
-        if (frame != activeFrame &&
-            touchBackImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok &&
-            touchHeadImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok &&
-            touchFrontImage->SelectActiveFrame(&FrameDimensionTime, frame) == Ok) {
+        if (frame != activeFrame && SelectLayerFrames(frame, *touchBackImage, *touchHeadImage, *touchFrontImage)) {
             activeFrame = frame;
             RenderClock(window);
         }
@@ -196,12 +224,22 @@ void AnimateBackground(HWND window) {
         SetTimer(window, 2, std::max(1u, touchFrameEnds[frame] - phase), nullptr);
         return;
     }
-    Bitmap* previousAnimation = CurrentGif();
-    Bitmap* animation = gifImage.get();
+    AnimationImage* previousAnimation = CurrentGif();
+    if (patReleaseActive && elapsed >= patEndFrameEnds.back()) {
+        patReleaseActive = false;
+        animationStart = now;
+        idlePhaseOffset = 0;
+        elapsed = 0;
+    }
+    AnimationImage* animation = gifImage.get();
     const std::vector<UINT>* ends = &frameEnds;
     ULONGLONG localElapsed = elapsed + idlePhaseOffset;
     UINT frameOffset = 0;
-    if (blankPlaybackActive) {
+    if (patActive || patReleaseActive) {
+        animation = patActive ? patIdleImage.get() : patEndImage.get();
+        ends = patActive ? &patIdleFrameEnds : &patEndFrameEnds;
+        localElapsed = elapsed;
+    } else if (blankPlaybackActive) {
         animation = blankImage.get();
         ends = &blankFrameEnds;
         localElapsed = elapsed;
@@ -259,7 +297,7 @@ void AnimateBackground(HWND window) {
     const UINT frame = localFrame + frameOffset;
     bool rendered = false;
     if ((animation != previousAnimation || frame != activeFrame) &&
-        animation->SelectActiveFrame(&FrameDimensionTime, frame) == Ok) {
+        animation->SelectFrame(frame) == Ok) {
         activeFrame = frame;
         RenderClock(window);
         rendered = true;
@@ -320,7 +358,7 @@ void StartReaction(HWND window) {
 void StartCheekPull(HWND window) {
     StopAlarmSound();
     BeginCheekPull();
-    PlaySoundFile(L"touch_start.wav");
+    PlaySoundFile(L"touch_start.wav", EffectSoundCategory::Start);
     SetCapture(window);
     RenderClock(window);
     AnimateBackground(window);
@@ -335,7 +373,7 @@ void UpdateCheekPull(HWND window, PointF mouse) {
 void FinishCheekPull(HWND window) {
     if (!cheekDragging) return;
     EndCheekPull();
-    PlaySoundFile(L"touch_end.wav");
+    PlayInteractionEndSound(L"touch");
     RenderClock(window);
     AnimateBackground(window);
 }
@@ -349,7 +387,8 @@ void FinishLayoutDrag(HWND window, bool releaseCapture) {
 }
 
 bool IsReactionPoint(float x, float y) {
-    return std::hypot(x - clockCenter.X, y - clockCenter.Y) <= TouchRadius;
+    return std::hypot((x - clockCenter.X) / HeadTouchRadiusX,
+        (y - clockCenter.Y) / TouchRadius) <= 1.0f;
 }
 
 bool IsCheekPoint(float x, float y) {
@@ -364,6 +403,8 @@ PointF ClickPoint(HWND window, LPARAM position) {
     return PointF(GET_X_LPARAM(position) * artworkWidth / static_cast<float>(rect.right),
         GET_Y_LPARAM(position) * artworkHeight / static_cast<float>(rect.bottom));
 }
+
+#include "clock-head-interaction.h"
 
 void UpdateClock(HWND window) {
     SYSTEMTIME now;
@@ -516,6 +557,19 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         return 0;
     case WM_TIMER:
         if (wParam == 2) { AnimateBackground(window); return 0; }
+        if (wParam == PatHeartTimer) {
+            const bool active = AdvancePatHeartEffect(GetTickCount64());
+            RenderClock(window);
+            if (!active) KillTimer(window, PatHeartTimer);
+            return 0;
+        }
+        if (wParam == HeadHoldTimer) {
+            KillTimer(window, HeadHoldTimer);
+            if (headPressPending && GetCapture() == window) {
+                StartPat(window);
+            }
+            return 0;
+        }
         RecoverTopmostState(window);
         UpdateClock(window);
         CheckAlarmSoundValidation(window);
@@ -527,6 +581,16 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         return 0;
     case WM_LBUTTONDOWN:
         {
+            const PointF point = ClickPoint(window, lParam);
+#ifdef SKEA_TEST_BUILD
+            if (TestAlarmButtonBounds.Contains(point)) {
+                layoutEditing = false;
+                SYSTEMTIME now;
+                GetLocalTime(&now);
+                StartAlarm(window, now);
+                return 0;
+            }
+#endif
             if (layoutEditing) {
                 RECT client;
                 GetClientRect(window, &client);
@@ -542,10 +606,17 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 }
                 return 0;
             }
-            const PointF point = ClickPoint(window, lParam);
             if (IsReactionPoint(point.X, point.Y)) {
-                BeginSmashStarEffect(point);
-                StartReaction(window);
+                headPressPending = true;
+                headPressStart = GetTickCount64();
+                headPressPoint = point;
+                headPressMouse = point;
+                headPressClientPoint = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+                SetCapture(window);
+                SetTimer(window, HeadHoldTimer, PatHoldMs, nullptr);
+#ifdef SKEA_TEST_BUILD
+                RenderClock(window);
+#endif
             }
             else if (IsCheekPoint(point.X, point.Y)) StartCheekPull(window);
         }
@@ -563,11 +634,18 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             }
             return 0;
         }
+        if (wParam & MK_LBUTTON) UpdateHeadPress(window, lParam);
         if (cheekDragging) UpdateCheekPull(window, ClickPoint(window, lParam));
         return 0;
     case WM_LBUTTONUP:
         if (layoutEditing && layoutDrag != LayoutHandle::None) {
             FinishLayoutDrag(window, true);
+            return 0;
+        }
+        if (headPressPending || patActive) {
+            UpdateHeadPress(window, lParam);
+            FinishHeadPress(window, true);
+            if (GetCapture() == window) ReleaseCapture();
             return 0;
         }
         if (cheekDragging) {
@@ -576,10 +654,14 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
         return 0;
     case WM_CAPTURECHANGED:
-    case WM_CANCELMODE:
+    case WM_CANCELMODE: {
+        const bool headPressCaptured = headPressPending || patActive;
         if (layoutDrag != LayoutHandle::None) FinishLayoutDrag(window, false);
+        FinishHeadPress(window, false);
+        if (message == WM_CANCELMODE && headPressCaptured && GetCapture() == window) ReleaseCapture();
         FinishCheekPull(window);
         return 0;
+    }
     case WM_SETCURSOR:
         if (layoutEditing && LOWORD(lParam) == HTCLIENT) {
             POINT cursor;
@@ -712,6 +794,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 SetWindowTextW(alarmEditorWindow, UiText().alarmAdd);
                 InvalidateRect(alarmEditorWindow, nullptr, TRUE);
             }
+            PlaySoundFile(L"smile.wav");
             return 0;
         }
         switch (LOWORD(wParam)) {
@@ -733,6 +816,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     case WM_DESTROY:
         KillTimer(window, 1);
         KillTimer(window, 2);
+        KillTimer(window, HeadHoldTimer);
+        KillTimer(window, PatHeartTimer);
         StopForegroundMonitor();
         CancelAlarmSoundValidation();
         ShutdownSoundSystem();
@@ -744,7 +829,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 }
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
-    HANDLE mutex = CreateMutexW(nullptr, FALSE, L"Local\\SkeaClock.SingleInstance");
+    HANDLE mutex = CreateMutexW(nullptr, FALSE, InstanceMutexName);
     if (!mutex) return 1;
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
         HWND existing = FindWindowW(ClassName, L"Skea clock");

@@ -22,7 +22,8 @@ struct CheekWarpGrid {
 const CheekWarpGrid cheekWarpGrid;
 
 struct CheekWarpBuffers {
-    std::unique_ptr<Bitmap> source, result;
+    std::unique_ptr<Bitmap> source, result, composite;
+    PointF compositeOffset;
     Bitmap* sourceHead = nullptr;
     UINT sourceFrame = UINT_MAX;
     PointF sourceOffset;
@@ -34,13 +35,13 @@ struct CheekWarpBuffers {
     void Release() {
         source.reset();
         result.reset();
+        composite.reset();
         sourceHead = nullptr;
         sourceFrame = UINT_MAX;
         geometryReady = false;
     }
 
-    bool Prepare(Bitmap& back, Bitmap& head, PointF offset, UINT frame) {
-        const UINT width = back.GetWidth(), height = back.GetHeight();
+    bool Prepare(UINT width, UINT height, Bitmap& head, PointF offset, UINT frame) {
         if (!source || source->GetWidth() != width || source->GetHeight() != height) {
             Release();
             source = std::make_unique<Bitmap>(width, height, PixelFormat32bppPARGB);
@@ -61,6 +62,38 @@ struct CheekWarpBuffers {
             sourceOffset = offset;
         }
         return true;
+    }
+
+    Bitmap* ComposeLayers(AnimationImage& back, Bitmap* head, AnimationImage& front, PointF frontOffset) {
+        const PointF crop = front.FrameOffset();
+        frontOffset = PointF(frontOffset.X + crop.X, frontOffset.Y + crop.Y);
+        Bitmap* frontFrame = front.Frame();
+        Bitmap* backFrame = back.Frame();
+        if (!frontFrame || !backFrame) return nullptr;
+        const INT left = static_cast<INT>(std::floor(std::min(0.0f, frontOffset.X)));
+        const INT top = static_cast<INT>(std::floor(std::min(0.0f, frontOffset.Y)));
+        const UINT width = static_cast<UINT>(std::ceil(std::max(static_cast<float>(back.GetWidth()),
+            frontOffset.X + frontFrame->GetWidth())) - left);
+        const UINT height = static_cast<UINT>(std::ceil(std::max(static_cast<float>(back.GetHeight()),
+            frontOffset.Y + frontFrame->GetHeight())) - top);
+        if (!composite || composite->GetWidth() != width || composite->GetHeight() != height) {
+            composite = std::make_unique<Bitmap>(width, height, PixelFormat32bppPARGB);
+            if (composite->GetLastStatus() != Ok) {
+                composite.reset();
+                return nullptr;
+            }
+        }
+        compositeOffset = PointF(static_cast<float>(left), static_cast<float>(top));
+        Graphics graphics(composite.get());
+        graphics.Clear(Color(0, 0, 0, 0));
+        graphics.SetInterpolationMode(InterpolationModeNearestNeighbor);
+        const PointF backOffset = back.FrameOffset();
+        if (graphics.DrawImage(backFrame, static_cast<INT>(backOffset.X) - left,
+            static_cast<INT>(backOffset.Y) - top, backFrame->GetWidth(), backFrame->GetHeight()) != Ok) return nullptr;
+        if (head && graphics.DrawImage(head, -left, -top, head->GetWidth(), head->GetHeight()) != Ok) return nullptr;
+        if (graphics.DrawImage(frontFrame, static_cast<INT>(frontOffset.X) - left,
+            static_cast<INT>(frontOffset.Y) - top, frontFrame->GetWidth(), frontFrame->GetHeight()) != Ok) return nullptr;
+        return composite.get();
     }
 
     void PrepareGeometry(PointF newCenter, float newRadius) {

@@ -31,7 +31,6 @@ int alarmSoundVolume = 80;
 bool useCustomAlarmSound = false;
 std::wstring customAlarmSoundPath;
 std::wstring soundDirectory;
-std::vector<BYTE> currentSoundData;
 IMFMediaEngine* alarmMediaEngine = nullptr;
 bool alarmMediaFoundationStarted = false;
 bool alarmComInitialized = false;
@@ -147,7 +146,8 @@ std::uint32_t WaveValue32(const BYTE* data) {
     return value;
 }
 
-bool FindPcm16Data(const std::vector<BYTE>& wave, size_t& dataOffset, size_t& dataSize) {
+bool FindPcm16Data(const std::vector<BYTE>& wave, size_t& dataOffset, size_t& dataSize,
+    WAVEFORMATEX* format = nullptr) {
     if (wave.size() < 12 || std::memcmp(wave.data(), "RIFF", 4) != 0 ||
         std::memcmp(wave.data() + 8, "WAVE", 4) != 0) return false;
     bool pcm16 = false;
@@ -159,6 +159,7 @@ bool FindPcm16Data(const std::vector<BYTE>& wave, size_t& dataOffset, size_t& da
         if (std::memcmp(wave.data() + offset, "fmt ", 4) == 0 && chunkSize >= 16) {
             pcm16 = WaveValue16(wave.data() + content) == 1 &&
                 WaveValue16(wave.data() + content + 14) == 16;
+            if (format) std::memcpy(format, wave.data() + content, 16);
         } else if (std::memcmp(wave.data() + offset, "data", 4) == 0) {
             dataOffset = content;
             dataSize = chunkSize;
@@ -199,23 +200,31 @@ bool LoadPcmWave(const std::wstring& path, int volume, std::vector<BYTE>& wave) 
     return true;
 }
 
+#include "clock-effect-channel.h"
+
 void StopSound() {
-    PlaySoundW(nullptr, nullptr, 0);
-    currentSoundData.clear();
+    for (auto& channel : effectSoundChannels) channel.Stop();
 }
 
-void PlaySoundFile(const wchar_t* fileName) {
-    StopSound();
-    if (effectSoundVolume == 0) return;
-    if (!LoadPcmWave(soundDirectory + fileName, effectSoundVolume, currentSoundData)) return;
-    PlaySoundW(reinterpret_cast<LPCWSTR>(currentSoundData.data()), nullptr,
-        SND_MEMORY | SND_ASYNC | SND_NODEFAULT);
+void PlaySoundFile(const wchar_t* fileName, EffectSoundCategory category = EffectSoundCategory::Skea) {
+    if (category != EffectSoundCategory::Skea &&
+        !effectSoundChannels[static_cast<size_t>(EffectSoundCategory::Skea)].Stop()) return;
+    effectSoundChannels[static_cast<size_t>(category)].Play(soundDirectory + fileName, effectSoundVolume);
 }
 
 void PlayRandomIdleSound() {
     static std::mt19937 generator(std::random_device{}());
     static std::uniform_int_distribution<int> choice(0, 1);
     PlaySoundFile(choice(generator) ? L"idle1.wav" : L"idle2.wav");
+}
+
+void PlayInteractionEndSound(const wchar_t* interaction) {
+    static std::mt19937 generator(std::random_device{}());
+    static std::discrete_distribution<int> choice({ 4, 3, 3 });
+    const std::wstring end = std::wstring(interaction) + L"_end.wav";
+    const std::wstring voice = std::wstring(interaction) + std::to_wstring(choice(generator) + 1) + L".wav";
+    PlaySoundFile(end.c_str(), EffectSoundCategory::End);
+    PlaySoundFile(voice.c_str(), EffectSoundCategory::Skea);
 }
 
 bool InitializeAlarmSoundSystem() {
