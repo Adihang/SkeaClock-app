@@ -16,6 +16,7 @@ import android.view.*;
 import android.widget.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import androidx.preference.PreferenceManager;
 
 public class MainActivity extends Activity {
   static final String WIDGET_BONK = "bonk";
@@ -65,6 +66,11 @@ public class MainActivity extends Activity {
     setContentView(root);
     root.requestApplyInsets();
     render();
+  }
+
+  @Override
+  protected void attachBaseContext(Context newBase) {
+    super.attachBaseContext(LocaleHelper.onAttach(newBase));
   }
 
   @Override
@@ -436,6 +442,39 @@ public class MainActivity extends Activity {
               render();
             }));
     permissions();
+
+    // Language setting card
+    {
+      LinearLayout langCard = card();
+      langCard.addView(heading(getString(R.string.lang_title), 19));
+
+      final String[] langEntries = new String[] {getString(R.string.lang_system), getString(R.string.lang_korean), getString(R.string.lang_english)};
+      final String[] langValues = new String[] {"auto", "ko", "en"};
+
+      android.content.SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+      String cur = prefs.getString("selected_language", "auto");
+      int curIdx = 0;
+      for (int i = 0; i < langValues.length; i++) if (langValues[i].equals(cur)) { curIdx = i; break; }
+
+      Button langButton = button(getString(R.string.settings_language) + ": " + langEntries[curIdx], () -> {
+        new AlertDialog.Builder(this)
+            .setTitle(getString(R.string.lang_title))
+            .setSingleChoiceItems(langEntries, curIdx, (d, which) -> {
+              String sel = langValues[which];
+              if ("auto".equals(sel)) {
+                LocaleHelper.setLocale(this, java.util.Locale.getDefault().getLanguage());
+              } else {
+                LocaleHelper.setLocale(this, sel);
+              }
+              d.dismiss();
+              recreate();
+            })
+            .setNegativeButton(android.R.string.cancel, null)
+            .show();
+      });
+      langCard.addView(langButton);
+    }
+
     body.addView(button("홈 화면에 시계 위젯 추가", this::pinWidget));
     body.addView(
         text(

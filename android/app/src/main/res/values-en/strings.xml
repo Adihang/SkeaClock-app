@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SkeaClock</string>
+    <string name="settings">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="language_auto">System default</string>
+    <string name="language_ko">Korean</string>
+    <string name="language_en">English</string>
+
+    <string name="tab_clock">Clock</string>
+    <string name="tab_alarm">Alarm</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="lang_title">Language</string>
+    <string name="lang_system">System default</string>
+    <string name="lang_korean">Korean</string>
+    <string name="lang_english">English</string>
+
+    <!-- Add more translated strings as needed -->
+</resources>
