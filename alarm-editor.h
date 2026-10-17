@@ -30,11 +30,11 @@ std::wstring FormatAlarmTime(const Alarm& alarm) {
 }
 
 std::wstring AlarmDaysText(unsigned days) {
-    constexpr wchar_t labels[] = L"일월화수목금토";
+    const wchar_t* labels = UiText().alarmDays;
     constexpr int bits[] = { 6, 0, 1, 2, 3, 4, 5 };
     std::wstring text;
     for (int i = 0; i < 7; ++i) if (days & (1u << bits[i])) text += labels[i];
-    return text.empty() ? L"요일 없음" : text;
+    return text.empty() ? UiText().alarmNoDays : text;
 }
 
 std::wstring AlarmMenuLabel(const Alarm& alarm) {
@@ -266,7 +266,7 @@ LRESULT CALLBACK AlarmEditorProc(HWND window, UINT message, WPARAM wParam, LPARA
         centered.SetLineAlignment(StringAlignmentCenter);
         graphics.DrawString(L":", -1, &timeFont,
             RectF(colonX - 8, 0, 16, client.bottom * .5f), &centered, &text);
-        constexpr const wchar_t* dayLabels[] = { L"일", L"월", L"화", L"수", L"목", L"금", L"토" };
+        const wchar_t* dayLabels = UiText().alarmDays;
         const float dayRadius = std::min(14.0f * alarmEditorDpi / 96.0f,
             client.right / 7.0f * .4f);
         for (int i = 0; i < 7; ++i) {
@@ -275,7 +275,7 @@ LRESULT CALLBACK AlarmEditorProc(HWND window, UINT message, WPARAM wParam, LPARA
                 center.X - dayRadius, center.Y - dayRadius, dayRadius * 2, dayRadius * 2);
             Brush* dayText = i == 0 ? static_cast<Brush*>(&sundayText)
                 : i == 6 ? static_cast<Brush*>(&saturdayText) : static_cast<Brush*>(&text);
-            graphics.DrawString(dayLabels[i], -1, &dayFont,
+            graphics.DrawString(dayLabels + i, 1, &dayFont,
                 RectF(center.X - dayRadius, center.Y - dayRadius, dayRadius * 2, dayRadius * 2),
                 &centered, dayText);
         }
@@ -385,7 +385,7 @@ void OpenAlarmEditor(HWND owner, const Alarm* initial = nullptr) {
     const int height = MulDiv(96, alarmEditorDpi, 96);
     const int gap = MulDiv(8, alarmEditorDpi, 96);
     const RECT bounds = AlarmEditorBounds(clock, work, width, height, gap);
-    alarmEditorWindow = CreateWindowExW(WS_EX_TOOLWINDOW, AlarmEditorClassName, L"알람 추가",
+    alarmEditorWindow = CreateWindowExW(WS_EX_TOOLWINDOW, AlarmEditorClassName, UiText().alarmAdd,
         WS_POPUP, bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top,
         owner, nullptr, GetModuleHandleW(nullptr), nullptr);
     if (!alarmEditorWindow) return;

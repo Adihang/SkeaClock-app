@@ -119,13 +119,10 @@ bool ChooseAlarmSoundFile(HWND owner) {
     wchar_t file[32768] = {};
     OPENFILENAMEW dialog = { sizeof(dialog) };
     dialog.hwndOwner = owner;
-    dialog.lpstrFilter =
-        L"지원되는 미디어\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma;*.mp4;*.m4v;*.mov;*.wmv\0"
-        L"오디오 파일\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma\0"
-        L"동영상 파일\0*.mp4;*.m4v;*.mov;*.wmv\0\0";
+    dialog.lpstrFilter = UiText().alarmFileFilter;
     dialog.lpstrFile = file;
     dialog.nMaxFile = static_cast<DWORD>(std::size(file));
-    dialog.lpstrTitle = L"알람 소리 파일 선택";
+    dialog.lpstrTitle = UiText().alarmFileTitle;
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&dialog)) return false;
     if (!AlarmMediaFileSupported(file)) return false;

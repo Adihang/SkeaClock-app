@@ -38,8 +38,8 @@ void FinishAlarmSoundValidation(HWND window, AlarmValidationResult result) {
         SaveSoundSettings(settingsPath);
     }
     const wchar_t* warning = result == AlarmValidationResult::MediaUnavailable
-        ? L"윈도우 미디어 팩이 없습니다. 정상적으로 동작하지 않을 수 있습니다."
-        : L"선택한 알람 파일 실행 도중 오류가 발생했습니다";
+        ? UiText().mediaPackMissing
+        : UiText().alarmFileError;
     MessageBoxW(window, warning, L"Skea clock", MB_OK | MB_ICONWARNING);
 }
 

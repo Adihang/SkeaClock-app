@@ -274,10 +274,10 @@ bool ChooseTopmostException(HWND owner) {
     wchar_t file[32768] = {};
     OPENFILENAMEW dialog = { sizeof(dialog) };
     dialog.hwndOwner = owner;
-    dialog.lpstrFilter = L"프로그램\0*.exe\0모든 파일\0*.*\0\0";
+    dialog.lpstrFilter = UiText().programFileFilter;
     dialog.lpstrFile = file;
     dialog.nMaxFile = static_cast<DWORD>(std::size(file));
-    dialog.lpstrTitle = L"최상단 고정 예외 프로그램 선택";
+    dialog.lpstrTitle = UiText().programFileTitle;
     dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
     if (!GetOpenFileNameW(&dialog)) return false;
     return ToggleTopmostException(file);
