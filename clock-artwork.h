@@ -936,7 +936,8 @@ void DrawArtwork(Graphics& g, const SYSTEMTIME& now, bool drawDial, bool drawTic
             Bitmap* warped = WarpedPatImage();
             if (warped) {
                 image = warped;
-                crop = PointF();
+                const float padding = static_cast<float>(PatWarpPadding);
+                crop = PointF(-padding, -padding);
             }
         }
         if (image) g.DrawImage(image, RectF(position.X + crop.X * CharacterScale, position.Y + crop.Y * CharacterScale,

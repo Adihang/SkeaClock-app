@@ -23,6 +23,12 @@ struct UiStrings {
     const wchar_t* displayPrefix;
     const wchar_t* displayPrimary;
     const wchar_t* exit;
+    const wchar_t* autoUpdateCheck;
+    const wchar_t* githubVisit;
+    const wchar_t* updateAvailable;
+    const wchar_t* updateVisitGithub;
+    const wchar_t* updateIgnore;
+    const wchar_t* updateCancel;
     const wchar_t* alarmDays;
     const wchar_t* alarmNoDays;
     const wchar_t* trayTooltip;

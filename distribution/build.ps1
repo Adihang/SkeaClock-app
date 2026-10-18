@@ -1,6 +1,17 @@
 ﻿$ErrorActionPreference = 'Stop'
+$productVersion = '1.0.8'
 $root = Split-Path $PSScriptRoot -Parent
 $work = Join-Path $PSScriptRoot '.build'
+$output = Join-Path $PSScriptRoot 'SkeaClock.exe'
+# shortcut: deleting the previous EXE resets the revision; use a state file if numbering must survive deletion.
+$revision = 0
+if (Test-Path -LiteralPath $output -PathType Leaf) {
+    $previousVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($output)
+    if ($previousVersion.ProductVersion -eq $productVersion) {
+        $revision = $previousVersion.FilePrivatePart + 1
+    }
+}
+$fileVersion = "$productVersion.$revision"
 $utf8 = New-Object Text.UTF8Encoding($true)
 function Write-Utf8($path, $text) { [IO.File]::WriteAllText($path, $text, $utf8) }
 function Replace-Once($text, $old, $new) {
@@ -91,11 +102,11 @@ Push-Location -LiteralPath $work
 try {
     & rc.exe /nologo /fo assets.res assets.rc
     if ($LASTEXITCODE -ne 0) { throw 'Resource compilation failed.' }
-    & cl.exe /nologo /std:c++17 /W4 /WX /O2 /MT /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 skea-clock.cpp assets.res /Fo:clock.obj /Fe:SkeaClock.exe /link /SUBSYSTEM:WINDOWS
+    & cl.exe /nologo /std:c++17 /W4 /WX /O2 /MT /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 skea-clock.cpp assets.res /Fo:clock.obj /Fe:SkeaClock.exe /link /SUBSYSTEM:WINDOWS /MANIFEST:EMBED
     if ($LASTEXITCODE -ne 0) { throw 'C++ compilation failed.' }
-    & (Join-Path $PSScriptRoot 'update-metadata.ps1') -ExePath (Join-Path $work 'SkeaClock.exe')
-    Copy-Item -LiteralPath (Join-Path $work 'SkeaClock.exe') -Destination (Join-Path $PSScriptRoot 'SkeaClock.exe') -Force
+    & (Join-Path $PSScriptRoot 'update-metadata.ps1') -ExePath (Join-Path $work 'SkeaClock.exe') -ProductVersion $productVersion -FileVersion $fileVersion
+    Copy-Item -LiteralPath (Join-Path $work 'SkeaClock.exe') -Destination $output -Force
 } finally { Pop-Location }
 Set-Location -LiteralPath $PSScriptRoot
 Clear-Work
-Get-Item -LiteralPath (Join-Path $PSScriptRoot 'SkeaClock.exe') | Select-Object Name, Length
+Get-Item -LiteralPath $output | Select-Object Name, Length

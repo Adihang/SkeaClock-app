@@ -105,6 +105,7 @@ std::wstring FileName(const std::wstring& path) {
 #include "clock-menu-icons.h"
 #include "clock-exception-menu.h"
 #include "clock-language-menu.h"
+#include "clock-update-check.h"
 #include "clock-layout-editor.h"
 #include "alarm-editor.h"
 #include "clock-render-buffer.h"
@@ -124,6 +125,7 @@ void SaveSettings() {
     WritePrivateProfileStringW(L"clock", L"size", nullptr, settingsPath.c_str());
     SaveSoundSettings(settingsPath);
     SaveWindowBehaviorSettings(settingsPath);
+    WritePrivateProfileStringW(L"updates", L"enabled", autoCheckUpdates ? L"1" : L"0", settingsPath.c_str());
 }
 
 void RenderClock(HWND window) {
@@ -498,6 +500,9 @@ void ShowMenu(HWND window, POINT point) {
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(CreateLanguageMenu()), L"Language");
     icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_GLOBE));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | (autoCheckUpdates ? MF_CHECKED : 0), AutoUpdateCheck, UiText().autoUpdateCheck);
+    AppendMenuW(menu, MF_STRING, GithubVisit, UiText().githubVisit);
+    AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, Exit, UiText().exit);
     icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_CLOSE));
     SetForegroundWindow(window);
@@ -573,6 +578,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         RecoverTopmostState(window);
         UpdateClock(window);
         CheckAlarmSoundValidation(window);
+        CheckUpdateResult(window);
         return 0;
     case WM_TIMECHANGE:
         lastStep = -1;
@@ -803,6 +809,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         case Numbers: showNumbers = !showNumbers; break;
         case AlwaysOnTop: topmost = !topmost; ApplyTopmostState(window, true); break;
         case Taskbar: showTaskbar = !showTaskbar; ApplyTaskbarSetting(window); break;
+        case AutoUpdateCheck: autoCheckUpdates = !autoCheckUpdates; break;
+        case GithubVisit:
+            ShellExecuteW(window, L"open", GithubProjectUrl, nullptr, nullptr, SW_SHOWNORMAL);
+            return 0;
         case Exit: DestroyWindow(window); return 0;
         default: return 0;
         }
@@ -820,6 +830,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         KillTimer(window, PatHeartTimer);
         StopForegroundMonitor();
         CancelAlarmSoundValidation();
+        updateCheck.reset();
         ShutdownSoundSystem();
         Shell_NotifyIconW(NIM_DELETE, &tray);
         PostQuitMessage(0);
@@ -849,6 +860,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     LoadLanguageSettings(settingsPath);
     LoadSoundSettings(settingsPath);
     LoadWindowBehaviorSettings(settingsPath);
+    autoCheckUpdates = GetPrivateProfileIntW(L"updates", L"enabled", 1, settingsPath.c_str()) != 0;
     wchar_t display[MAX_PATH] = {};
     GetPrivateProfileStringW(L"clock", L"display", L"", display, MAX_PATH, settingsPath.c_str());
     selectedDisplay = display;
@@ -894,6 +906,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         StartForegroundMonitor(window);
         ApplyTopmostState(window, true);
         BeginAlarmSoundValidation(window);
+        BeginUpdateCheck();
         MSG message;
         int status;
         while ((status = GetMessageW(&message, nullptr, 0, 0)) > 0) {

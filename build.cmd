@@ -22,7 +22,7 @@ if errorlevel 1 exit /b 1
 if not exist bin mkdir bin
 rc /nologo /fo bin\skea-clock.res skea-clock.rc
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /W4 /O2 /MT /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 skea-clock.cpp bin\skea-clock.res /Fo:bin\skea-clock.obj /Fe:bin\SkeaClock.exe /link /SUBSYSTEM:WINDOWS
+cl /nologo /std:c++17 /W4 /O2 /MT /EHsc /utf-8 /D_WIN32_WINNT=0x0A00 skea-clock.cpp bin\skea-clock.res /Fo:bin\skea-clock.obj /Fe:bin\SkeaClock.exe /link /SUBSYSTEM:WINDOWS /MANIFEST:EMBED
 if errorlevel 1 exit /b 1
 echo Built: bin\SkeaClock.exe
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0distribution\update-metadata.ps1" -ExePath "%~dp0bin\SkeaClock.exe"
