@@ -851,9 +851,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         return 1;
     }
     std::wstring directory = settingsPath.substr(0, settingsPath.find_last_of(L"\\/") + 1);
-    std::wstring sourceDirectory = directory + L"source\\";
+    std::wstring sourceDirectory = directory + L"sources\\";
     if (GetFileAttributesW((sourceDirectory + L"locate data\\clock-layout.ini").c_str()) == INVALID_FILE_ATTRIBUTES)
-        sourceDirectory = directory + L"..\\source\\";
+        sourceDirectory = directory + L"..\\sources\\";
     SetSoundDirectory(sourceDirectory);
     if (!LoadArtwork(sourceDirectory)) {
         const std::wstring error = std::wstring(UiText().artworkLoadError) + L"\n\n" + UiText().artworkLoadHelp;

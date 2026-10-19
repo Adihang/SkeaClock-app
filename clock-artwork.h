@@ -3,6 +3,7 @@
 #include <array>
 #include <climits>
 #include <memory>
+#include "clock-image-scale.h"
 
 constexpr float DialRadius = 108.0f;
 constexpr float TouchRadius = DialRadius * 0.3f;
@@ -10,11 +11,11 @@ constexpr float HeadTouchRadiusX = TouchRadius * 1.5f;
 constexpr float PatWarpRadius = TouchRadius * 3;
 constexpr float PatFollowFraction = 0.15f;
 constexpr float CheekTouchRadius = TouchRadius * 0.6f;
-constexpr float CharacterScale = 0.8f;
-constexpr float HandScale = 0.9f;
+constexpr float CharacterScale = 0.8f / SourceImageScale;
+constexpr float HandScale = 0.9f / SourceImageScale;
 constexpr float TimeHandLengthScales[2] = { .95f, 1.05f };
 constexpr float MaxInwardCheekPull = 0.3f;
-constexpr float CheekSeamOverlap = 1.0f;
+constexpr float CheekSeamOverlap = SourceImageScale;
 constexpr UINT HandReturnMs = 750;
 constexpr UINT SmashStartFrame = 4;
 constexpr UINT AngryCutFrame = 14;
@@ -209,11 +210,16 @@ bool LoadArtwork(const std::wstring& directory) {
         GetPrivateProfileStringW(section, key, L"", value, MAX_PATH, config.c_str());
         return std::wstring(value);
     };
+    auto readFloat = [&](const wchar_t* section, const wchar_t* key, float missing = -1.0f) {
+        float value = missing;
+        swscanf_s(readString(section, key).c_str(), L"%f", &value);
+        return value;
+    };
     auto point = [&](const wchar_t* section, const wchar_t* x, const wchar_t* y) {
-        return PointF(read(section, x) + .5f, read(section, y) + .5f);
+        return PointF(readFloat(section, x) + .5f, readFloat(section, y) + .5f);
     };
     auto valid = [](PointF p, auto& image) {
-        return p.X >= .5f && p.Y >= .5f && p.X < image.GetWidth() && p.Y < image.GetHeight();
+        return p.X >= 0 && p.Y >= 0 && p.X < image.GetWidth() && p.Y < image.GetHeight();
     };
     auto loadImage = [&](const wchar_t* section, std::unique_ptr<AnimationImage>& image) {
         const std::wstring file = readString(section, L"file");
@@ -227,9 +233,9 @@ bool LoadArtwork(const std::wstring& directory) {
     cheekTouchSource = point(L"touch", L"x", L"y");
     if (!valid(cheekTouchSource, *transitionImage)) return false;
     auto loadAligned = [&](const wchar_t* section, std::unique_ptr<AnimationImage>& image, PointF& offset) {
-        const int x = GetPrivateProfileIntW(section, L"offsetX", INT_MAX, config.c_str());
-        const int y = GetPrivateProfileIntW(section, L"offsetY", INT_MAX, config.c_str());
-        if (x == INT_MAX || y == INT_MAX || !loadImage(section, image)) return false;
+        const float x = readFloat(section, L"offsetX", static_cast<float>(INT_MAX));
+        const float y = readFloat(section, L"offsetY", static_cast<float>(INT_MAX));
+        if (x == static_cast<float>(INT_MAX) || y == static_cast<float>(INT_MAX) || !loadImage(section, image)) return false;
         offset = PointF(static_cast<float>(x), static_cast<float>(y));
         return true;
     };
@@ -246,7 +252,7 @@ bool LoadArtwork(const std::wstring& directory) {
         !loadAligned(L"touch_end_head", touchEndHeadImage, touchEndHeadOffset) ||
         !loadAligned(L"touch_end_front", touchEndFrontImage, touchEndFrontOffset)) return false;
     const int touchWarpFrameCount = read(L"touch_head", L"frameCount");
-    touchWarpBaseRadius = static_cast<float>(read(L"touch_head", L"radius"));
+    touchWarpBaseRadius = readFloat(L"touch_head", L"radius");
     if (touchWarpFrameCount <= 0 || touchWarpBaseRadius <= 0 ||
         touchWarpFrameCount != static_cast<int>(touchHeadImage->GetFrameCount())) return false;
     touchWarpCenters.clear();
@@ -254,8 +260,8 @@ bool LoadArtwork(const std::wstring& directory) {
         const std::wstring key = L"frame" + std::to_wstring(i);
         wchar_t value[64] = {};
         GetPrivateProfileStringW(L"touch_head", key.c_str(), L"", value, 64, config.c_str());
-        int x = -1, y = -1;
-        if (swscanf_s(value, L"%d,%d", &x, &y) != 2) return false;
+        float x = -1, y = -1;
+        if (swscanf_s(value, L"%f,%f", &x, &y) != 2) return false;
         PointF center(x + .5f, y + .5f);
         if (!valid(center, *touchHeadImage)) return false;
         touchWarpCenters.push_back(center);

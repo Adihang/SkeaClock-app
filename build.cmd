@@ -17,8 +17,6 @@ if not defined VSINSTALL (
 )
 call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat" >nul
 if errorlevel 1 exit /b 1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0prepare-assets.ps1"
-if errorlevel 1 exit /b 1
 if not exist bin mkdir bin
 rc /nologo /fo bin\skea-clock.res skea-clock.rc
 if errorlevel 1 exit /b 1

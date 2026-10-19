@@ -55,8 +55,15 @@ struct CheekWarpBuffers {
             Graphics graphics(source.get());
             graphics.Clear(Color(0, 0, 0, 0));
             graphics.SetCompositingMode(CompositingModeSourceCopy);
-            if (graphics.DrawImage(&head, static_cast<INT>(offset.X), static_cast<INT>(offset.Y),
-                head.GetWidth(), head.GetHeight()) != Ok) return false;
+            if constexpr (SourceImageScale == 1.0f) {
+                if (graphics.DrawImage(&head, static_cast<INT>(offset.X), static_cast<INT>(offset.Y),
+                    head.GetWidth(), head.GetHeight()) != Ok) return false;
+            } else {
+                graphics.SetInterpolationMode(InterpolationModeBilinear);
+                if (graphics.DrawImage(&head, RectF(offset.X, offset.Y,
+                    static_cast<float>(head.GetWidth()), static_cast<float>(head.GetHeight())),
+                    0, 0, static_cast<float>(head.GetWidth()), static_cast<float>(head.GetHeight()), UnitPixel) != Ok) return false;
+            }
             sourceHead = &head;
             sourceFrame = frame;
             sourceOffset = offset;
@@ -86,13 +93,20 @@ struct CheekWarpBuffers {
         compositeOffset = PointF(static_cast<float>(left), static_cast<float>(top));
         Graphics graphics(composite.get());
         graphics.Clear(Color(0, 0, 0, 0));
-        graphics.SetInterpolationMode(InterpolationModeNearestNeighbor);
+        graphics.SetInterpolationMode(SourceImageScale == 1.0f ? InterpolationModeNearestNeighbor : InterpolationModeBilinear);
+        auto draw = [&](Bitmap* image, float x, float y) {
+            if constexpr (SourceImageScale == 1.0f) {
+                return graphics.DrawImage(image, static_cast<INT>(x), static_cast<INT>(y),
+                    image->GetWidth(), image->GetHeight());
+            } else {
+                const float w = static_cast<float>(image->GetWidth()), h = static_cast<float>(image->GetHeight());
+                return graphics.DrawImage(image, RectF(x, y, w, h), 0, 0, w, h, UnitPixel);
+            }
+        };
         const PointF backOffset = back.FrameOffset();
-        if (graphics.DrawImage(backFrame, static_cast<INT>(backOffset.X) - left,
-            static_cast<INT>(backOffset.Y) - top, backFrame->GetWidth(), backFrame->GetHeight()) != Ok) return nullptr;
-        if (head && graphics.DrawImage(head, -left, -top, head->GetWidth(), head->GetHeight()) != Ok) return nullptr;
-        if (graphics.DrawImage(frontFrame, static_cast<INT>(frontOffset.X) - left,
-            static_cast<INT>(frontOffset.Y) - top, frontFrame->GetWidth(), frontFrame->GetHeight()) != Ok) return nullptr;
+        if (draw(backFrame, backOffset.X - left, backOffset.Y - top) != Ok) return nullptr;
+        if (head && draw(head, static_cast<float>(-left), static_cast<float>(-top)) != Ok) return nullptr;
+        if (draw(frontFrame, frontOffset.X - left, frontOffset.Y - top) != Ok) return nullptr;
         return composite.get();
     }
 

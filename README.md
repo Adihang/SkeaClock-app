@@ -15,6 +15,8 @@ Windows 화면에 스키아 시계를 띄워 두고, 꿀밤과 볼 당기기, �
 
 **[최신 버전 다운로드 (.exe)](https://github.com/junhwan123/SkeaClock/releases/latest/download/SkeaClock.exe)**
 
+만약 CPU, 메모리 사용량이 부담된다면 **[저해상도 버전 다운로드 (.exe)](https://github.com/junhwan123/SkeaClock/releases/latest/download/SkeaClock_low.exe)**
+
 상단 경로를 사용하거나 release 페이지에서 최신 버전을 다운받으세요.
 
 ## 사용 가이드

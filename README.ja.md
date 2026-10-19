@@ -17,6 +17,8 @@ Windowsの画面にスキアの時計を表示して、デコピンや頬を引�
 
 **[最新版をダウンロード (.exe)](https://github.com/junhwan123/SkeaClock/releases/latest/download/SkeaClock.exe)**
 
+CPUやメモリの使用量が気になる場合は、**[低解像度版をダウンロード (.exe)](https://github.com/junhwan123/SkeaClock/releases/latest/download/SkeaClock_low.exe)**をご利用ください。
+
 上記のリンクを使用するか、Releasesページから最新版をダウンロードしてください。
 
 ## 使い方
