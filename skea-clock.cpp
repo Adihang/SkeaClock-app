@@ -27,7 +27,6 @@ constexpr wchar_t ClassName[] = L"SkeaClockWindow";
 constexpr wchar_t InstanceMutexName[] = L"Local\\SkeaClock.SingleInstance";
 #endif
 constexpr int AppIconResource = SKEA_APP_ICON;
-constexpr UINT TrayMessage = WM_APP + 1;
 constexpr int Background = 101, Ticks = 103, Numbers = 104;
 constexpr int AlwaysOnTop = 105, Exit = 106, EditLayout = 107;
 constexpr int DisplayFirst = 200, MaxDisplays = 32;
@@ -38,7 +37,6 @@ unsigned long long lastAlarmMinuteKey = ULLONG_MAX;
 unsigned long long activeAlarmMinuteKey = ULLONG_MAX;
 std::wstring settingsPath;
 std::wstring selectedDisplay, activeDisplay;
-NOTIFYICONDATAW tray = {};
 
 struct DisplayInfo {
     MONITORINFOEXW info;
@@ -106,6 +104,7 @@ std::wstring FileName(const std::wstring& path) {
 #include "clock-exception-menu.h"
 #include "clock-language-menu.h"
 #include "clock-update-check.h"
+#include "clock-startup.h"
 #include "clock-layout-editor.h"
 #include "alarm-editor.h"
 #include "clock-render-buffer.h"
@@ -425,9 +424,6 @@ void UpdateClock(HWND window) {
     int step = now.wHour * 3600 + now.wMinute * 60 + now.wSecond;
     if (step == lastStep) return;
     lastStep = step;
-    swprintf_s(tray.szTip, UiText().trayTooltip,
-        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute);
-    Shell_NotifyIconW(NIM_MODIFY, &tray);
     RenderClock(window);
 }
 
@@ -485,6 +481,7 @@ void ShowMenu(HWND window, POINT point) {
     AppendMenuW(menu, MF_STRING | (topmost ? MF_CHECKED : 0), AlwaysOnTop, UiText().alwaysOnTop);
     AppendTopmostExceptionMenu(menu);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(menu, MF_STRING | (IsStartupEnabled() ? MF_CHECKED : 0), RunAtStartup, UiText().runAtStartup);
     AppendMenuW(menu, MF_STRING | (showTaskbar ? MF_CHECKED : 0), Taskbar, UiText().taskbar);
     AppendMenuW(menu, MF_STRING | (layoutEditing ? MF_CHECKED : 0), EditLayout, UiText().layout);
     icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_MOVE));
@@ -502,6 +499,7 @@ void ShowMenu(HWND window, POINT point) {
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING | (autoCheckUpdates ? MF_CHECKED : 0), AutoUpdateCheck, UiText().autoUpdateCheck);
     AppendMenuW(menu, MF_STRING, GithubVisit, UiText().githubVisit);
+    icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_GITHUB));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, Exit, UiText().exit);
     icons.SetLast(menu, MAKEINTRESOURCEW(SKEA_MENU_CLOSE));
@@ -515,11 +513,6 @@ void ShowMenu(HWND window, POINT point) {
 }
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
-    static const UINT taskbarCreated = RegisterWindowMessageW(L"TaskbarCreated");
-    if (message == taskbarCreated) {
-        Shell_NotifyIconW(NIM_ADD, &tray);
-        return 0;
-    }
     if (message == AlarmEditorClosedMessage) {
         if (!alarmEditorWindow && !layoutEditing) StopBlankPlayback(window);
         return 0;
@@ -549,14 +542,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     }
     switch (message) {
     case WM_CREATE:
-        tray.cbSize = sizeof(tray);
-        tray.hWnd = window;
-        tray.uID = 1;
-        tray.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-        tray.uCallbackMessage = TrayMessage;
-        tray.hIcon = AppIcon();
-        wcscpy_s(tray.szTip, L"Skea clock");
-        Shell_NotifyIconW(NIM_ADD, &tray);
         SetTimer(window, 1, 100, nullptr);
         AnimateBackground(window);
         return 0;
@@ -692,16 +677,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         ShowMenu(window, point);
         return 0;
     }
-    case TrayMessage:
-        if (lParam == WM_RBUTTONUP || lParam == WM_CONTEXTMENU) {
-            POINT point;
-            GetCursorPos(&point);
-            ShowMenu(window, point);
-        } else if (lParam == WM_LBUTTONDBLCLK) {
-            ShowWindow(window, SW_SHOWNOACTIVATE);
-            ApplyTopmostState(window, true);
-        }
-        return 0;
     case WM_COMMAND:
         if (LOWORD(wParam) == TopmostExceptionAdd) {
             if (ChooseTopmostException(window)) {
@@ -809,6 +784,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         case Numbers: showNumbers = !showNumbers; break;
         case AlwaysOnTop: topmost = !topmost; ApplyTopmostState(window, true); break;
         case Taskbar: showTaskbar = !showTaskbar; ApplyTaskbarSetting(window); break;
+        case RunAtStartup:
+            if (SetStartupEnabled(!IsStartupEnabled()) != ERROR_SUCCESS)
+                MessageBoxW(window, UiText().startupError, L"Skea clock", MB_OK | MB_ICONERROR);
+            return 0;
         case AutoUpdateCheck: autoCheckUpdates = !autoCheckUpdates; break;
         case GithubVisit:
             ShellExecuteW(window, L"open", GithubProjectUrl, nullptr, nullptr, SW_SHOWNORMAL);
@@ -832,7 +811,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         CancelAlarmSoundValidation();
         updateCheck.reset();
         ShutdownSoundSystem();
-        Shell_NotifyIconW(NIM_DELETE, &tray);
         PostQuitMessage(0);
         return 0;
     }

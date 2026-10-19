@@ -18,6 +18,8 @@ const UiStrings NewLanguageStrings = [] {
     text.topmostExceptions = L"최상단 고정 예외";
     text.noPrograms = L"(프로그램 없음)";
     text.programChoose = L"프로그램 선택...";
+    text.runAtStartup = L"시작 시 자동 실행";
+    text.startupError = L"시작 프로그램 설정을 변경하지 못했습니다. 실행 파일 경로 길이와 레지스트리 접근 권한을 확인해 주세요.";
     text.taskbar = L"작업 표시줄 표시";
     text.layout = L"크기·위치 이동";
     text.displaySelect = L"표시 디스플레이";
@@ -32,7 +34,6 @@ const UiStrings NewLanguageStrings = [] {
     text.updateCancel = L"취소";
     text.alarmDays = L"일월화수목금토";
     text.alarmNoDays = L"요일 없음";
-    text.trayTooltip = L"Skea clock · %04u-%02u-%02u %02u:%02u\n우클릭: 설정 및 종료";
     text.alarmFileFilter =
         L"지원되는 미디어\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma;*.mp4;*.m4v;*.mov;*.wmv\0"
         L"오디오 파일\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma\0"

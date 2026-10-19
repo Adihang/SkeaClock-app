@@ -18,6 +18,8 @@ const UiStrings JapaneseStrings = [] {
     text.topmostExceptions = L"「常に手前に表示」の例外";
     text.noPrograms = L"(プログラムなし)";
     text.programChoose = L"プログラムを選択...";
+    text.runAtStartup = L"Windows 起動時に自動実行";
+    text.startupError = L"スタートアップの設定を変更できませんでした。実行ファイルのパスの長さとレジストリへのアクセス権限を確認してください。";
     text.taskbar = L"タスクバーに表示";
     text.layout = L"サイズ・位置の調整";
     text.displaySelect = L"表示先ディスプレイ";
@@ -32,7 +34,6 @@ const UiStrings JapaneseStrings = [] {
     text.updateCancel = L"キャンセル";
     text.alarmDays = L"日月火水木金土";
     text.alarmNoDays = L"曜日なし";
-    text.trayTooltip = L"Skea clock · %04u-%02u-%02u %02u:%02u\n右クリック: 設定と終了";
     text.alarmFileFilter =
         L"対応するメディア\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma;*.mp4;*.m4v;*.mov;*.wmv\0"
         L"オーディオファイル\0*.wav;*.mp3;*.m4a;*.aac;*.flac;*.wma\0"

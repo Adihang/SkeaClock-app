@@ -17,6 +17,8 @@ struct UiStrings {
     const wchar_t* topmostExceptions;
     const wchar_t* noPrograms;
     const wchar_t* programChoose;
+    const wchar_t* runAtStartup;
+    const wchar_t* startupError;
     const wchar_t* taskbar;
     const wchar_t* layout;
     const wchar_t* displaySelect;
@@ -31,7 +33,6 @@ struct UiStrings {
     const wchar_t* updateCancel;
     const wchar_t* alarmDays;
     const wchar_t* alarmNoDays;
-    const wchar_t* trayTooltip;
     const wchar_t* alarmFileFilter;
     const wchar_t* alarmFileTitle;
     const wchar_t* programFileFilter;
