@@ -6,3 +6,4 @@
 #define SKEA_MENU_VM 4
 #define SKEA_MENU_CLOSE 5
 #define SKEA_MENU_GLOBE 6
+#define SKEA_MENU_GITHUB 7

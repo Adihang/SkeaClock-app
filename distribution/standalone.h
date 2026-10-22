@@ -2,6 +2,7 @@
 #include <shlobj.h>
 #include <cstring>
 #include "assets.h"
+#include "clock-image-scale.h"
 
 // Runs once at startup. The existing artwork/audio loaders keep their file paths.
 bool SameAsset(const std::wstring& path, const BYTE* bytes, DWORD size) {
@@ -29,7 +30,7 @@ bool PrepareStandalone(std::wstring& settings, std::wstring& source) {
     const std::wstring directory = std::wstring(local) + L"\\SkeaClock";
     CoTaskMemFree(local);
     settings = directory + L"\\skea-clock.ini";
-    source = directory + L"\\assets\\";
+    source = directory + (SourceImageScale == 1.0f ? L"\\assets\\" : L"\\assets-low-resolution\\");
     for (const auto& asset : EmbeddedAssets) {
         HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(asset.id), RT_RCDATA);
         if (!resource) return false;
