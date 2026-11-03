@@ -19,8 +19,4 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
-    <string name="app_name">스키아 시계</string>
-    <string name="widget_description">시계만 표시하며, 시계 위의 투명한 5×5 입력 영역으로 꿀밤과 16방향 볼 당기기를 실행합니다.</string>
-    <string name="widget_cover_label">스키아 시계 커버 위젯</string>
-    <string name="widget_cover_description">Z 플립 커버 화면에서 시계만 표시하고 투명한 5×5 입력 영역으로 캐릭터를 조작합니다.</string>
 </resources>

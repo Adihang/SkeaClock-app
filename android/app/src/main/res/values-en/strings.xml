@@ -1,20 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SkeaClock</string>
-    <string name="settings">Settings</string>
-    <string name="settings_language">Language</string>
-    <string name="language_auto">System default</string>
-    <string name="language_ko">Korean</string>
-    <string name="language_en">English</string>
-
+    <string name="app_name">Skea Clock</string>
+    <string name="widget_description">Displays only the clock. Use the invisible 5×5 touch grid to trigger bonks and 16-direction cheek pulls.</string>
+    <string name="widget_cover_label">Skea Clock cover widget</string>
+    <string name="widget_cover_description">Shows only the clock on the Z Flip cover screen, with an invisible 5×5 grid for character interactions.</string>
+    <string name="date_format">EEE, MMM d</string>
+    <string name="next_alarm_date_format">MMM d, HH:mm</string>
     <string name="tab_clock">Clock</string>
     <string name="tab_alarm">Alarm</string>
     <string name="tab_settings">Settings</string>
-
-    <string name="lang_title">Language</string>
-    <string name="lang_system">System default</string>
-    <string name="lang_korean">Korean</string>
-    <string name="lang_english">English</string>
-
-    <!-- Add more translated strings as needed -->
+    <string name="clock_content_description">Skea clock. Tap the head for a bonk, hold or drag to pet, or pull a cheek.</string>
+    <string name="widget_dial_background">Clock face</string>
+    <string name="widget_idle_character">Animated character</string>
+    <string name="widget_markers">Clock ticks and numbers</string>
+    <string name="widget_interaction_grid">Invisible 5×5 interaction grid over the clock</string>
+    <string name="slider_value">%1$s  %2$d%%</string>
+    <string name="clock_page_title">Time with Skea</string>
+    <string name="clock_tagline">Her ahoge keeps perfect time.</string>
+    <string name="clock_tip">Tap the head to bonk, hold or drag to pet, or pull a cheek to see a reaction.</string>
+    <string name="upcoming_alarm">Next alarm</string>
+    <string name="no_upcoming_alarm">A quiet day ahead. Add an alarm when you need one.</string>
+    <string name="exact_alarm_required">Allow exact alarms to schedule this alarm.</string>
+    <string name="manage_alarms">Manage alarms</string>
+    <string name="add_clock_widget">Add clock widget to Home screen</string>
+    <string name="alarm_page_title">Set a brighter morning</string>
+    <string name="alarm_page_subtitle">Manage alarm times and repeat days in the app.</string>
+    <string name="add_alarm">+ Add alarm</string>
+    <string name="no_alarms">No alarms yet</string>
+    <string name="first_alarm_hint">Add your first alarm and Skea will wake you up.</string>
+    <string name="alarm_toggle_description">Enable %1$s alarm</string>
+    <string name="saved_alarm_permission">Alarm saved. Allow exact alarms to schedule it.</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="delete_alarm_title">Delete alarm</string>
+    <string name="delete_alarm_message">Delete the %1$s alarm?</string>
+    <string name="alarm_label_hint">Alarm name</string>
+    <string name="default_alarm_label">Good morning</string>
+    <string name="repeat_days_optional">Repeat days · leave blank for one time</string>
+    <string name="repeat_once">Once</string>
+    <string name="repeat_daily">Every day</string>
+    <string name="new_alarm">New alarm</string>
+    <string name="edit_alarm">Edit alarm</string>
+    <string name="save">Save</string>
+    <string name="saved_alarm_needs_permission">Saved. Allow exact alarms to schedule it.</string>
+    <string-array name="weekday_names">
+        <item>Mon</item><item>Tue</item><item>Wed</item><item>Thu</item><item>Fri</item><item>Sat</item><item>Sun</item>
+    </string-array>
+    <string name="settings_page_title">Make Skea yours</string>
+    <string name="settings_page_subtitle">Clock appearance settings also apply to the Home screen widget.</string>
+    <string name="appearance">Clock appearance</string>
+    <string name="show_background">Show background</string>
+    <string name="show_ticks">Show tick marks</string>
+    <string name="show_numbers">Show numbers</string>
+    <string name="twenty_four_hour">24-hour time</string>
+    <string name="sound_vibration">Sound and vibration</string>
+    <string name="alarm_volume">Alarm volume</string>
+    <string name="device_alarm_volume_note">The device alarm volume is applied too.</string>
+    <string name="touch_volume">Interaction sound</string>
+    <string name="alarm_vibration">Alarm vibration</string>
+    <string name="alarm_sound_default">Alarm sound: Skea default voice</string>
+    <string name="alarm_sound_custom">Alarm sound: selected audio file</string>
+    <string name="choose_alarm_sound">Choose alarm audio</string>
+    <string name="reset_alarm_sound">Restore default alarm sound</string>
+    <string name="language">Language</string>
+    <string name="language_auto">System default</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_en">English</string>
+    <string name="settings_footer">Skea Clock 1.1 · Android\nThe widget shows only the clock. Tap its invisible touch areas to interact with Skea. Alarms ring for up to 10 minutes.</string>
+    <string name="alarm_status">Alarm readiness</string>
+    <string name="exact_alarm_available">✓ Exact alarms can be scheduled</string>
+    <string name="exact_alarm_permission_needed">Exact alarm permission is required</string>
+    <string name="allow_exact_alarm">Allow exact alarms</string>
+    <string name="allow_alarm_notifications">Allow alarm notifications</string>
+    <string name="allow_lock_screen_alarm">Allow lock screen alarms</string>
+    <string name="widget_manual_add_hint">Long-press the Home screen, then choose Widgets → Skea Clock.</string>
+    <string name="audio_file_unreadable">Cannot read this file. Choose another audio file.</string>
+    <string name="alarm_notification_title">Skea alarm</string>
+    <string name="alarm_notification_body">%1$s · Time to wake up</string>
+    <string name="snooze_action">Snooze 5 min</string>
+    <string name="stop_alarm_action">Turn off alarm</string>
+    <string name="snooze_permission_needed">Allow exact alarms to use snooze.</string>
+    <string name="ring_screen_title">Time to wake up</string>
+    <string name="ring_snooze">Snooze for 5 minutes</string>
+    <string name="ring_stop">Turn off alarm</string>
+    <string name="widget_bonk_accessibility">Trigger bonk animation in the head area</string>
+    <string name="widget_pat_accessibility">Trigger petting animation</string>
+    <string name="widget_cheek_accessibility">Pull cheek toward %1$s</string>
+    <string-array name="cheek_directions">
+        <item>right</item><item>22.5° down-right</item><item>down-right</item><item>67.5° down-right</item>
+        <item>down</item><item>112.5° down-left</item><item>down-left</item><item>157.5° down-left</item>
+        <item>left</item><item>202.5° up-left</item><item>up-left</item><item>247.5° up-left</item>
+        <item>up</item><item>292.5° up-right</item><item>up-right</item><item>337.5° up-right</item>
+    </string-array>
 </resources>

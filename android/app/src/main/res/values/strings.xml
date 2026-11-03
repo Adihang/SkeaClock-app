@@ -1,20 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">스케아클락</string>
-    <string name="settings">설정</string>
-    <string name="settings_language">언어</string>
-    <string name="language_auto">시스템 기본</string>
-    <string name="language_ko">한국어</string>
-    <string name="language_en">English</string>
-
+    <string name="app_name">스키아 시계</string>
+    <string name="widget_description">시계만 표시하며, 시계 위의 투명한 5×5 입력 영역으로 꿀밤과 16방향 볼 당기기를 실행합니다.</string>
+    <string name="widget_cover_label">스키아 시계 커버 위젯</string>
+    <string name="widget_cover_description">Z 플립 커버 화면에서 시계만 표시하고 투명한 5×5 입력 영역으로 캐릭터를 조작합니다.</string>
+    <string name="date_format">M월 d일 EEEE</string>
+    <string name="next_alarm_date_format">M월 d일 HH:mm</string>
     <string name="tab_clock">시계</string>
     <string name="tab_alarm">알람</string>
     <string name="tab_settings">설정</string>
-
-    <string name="lang_title">언어</string>
-    <string name="lang_system">시스템 기본</string>
-    <string name="lang_korean">한국어</string>
-    <string name="lang_english">English</string>
-
-    <!-- 간단한 문구 샘플: 필요시 더 추가하세요 -->
+    <string name="clock_content_description">스키아 시계. 머리를 짧게 누르면 꿀밤, 길게 누르거나 끌면 쓰다듬기, 볼을 끌어당기면 반응합니다.</string>
+    <string name="widget_dial_background">시계 배경</string>
+    <string name="widget_idle_character">흔들리는 캐릭터</string>
+    <string name="widget_markers">시계 눈금과 숫자</string>
+    <string name="widget_interaction_grid">시계 위 투명한 5×5 방향 입력</string>
+    <string name="slider_value">%1$s  %2$d%%</string>
+    <string name="clock_page_title">스키아와 함께하는 시간</string>
+    <string name="clock_tagline">바보털은 오늘도 정확하게.</string>
+    <string name="clock_tip">머리를 톡 누르면 꿀밤, 길게 누르거나 끌면 쓰다듬기, 볼을 끌어당기면 반응을 확인할 수 있어요.</string>
+    <string name="upcoming_alarm">다음 알람</string>
+    <string name="no_upcoming_alarm">여유로운 하루예요. 알람을 추가해 보세요.</string>
+    <string name="exact_alarm_required">정확한 알람 권한을 허용해야 예약됩니다.</string>
+    <string name="manage_alarms">알람 관리</string>
+    <string name="add_clock_widget">홈 화면에 시계 위젯 추가</string>
+    <string name="alarm_page_title">좋은 아침을 예약해요</string>
+    <string name="alarm_page_subtitle">시간과 반복 요일을 앱에서 관리하세요.</string>
+    <string name="add_alarm">+ 알람 추가</string>
+    <string name="no_alarms">아직 알람이 없어요</string>
+    <string name="first_alarm_hint">첫 알람을 추가하면 스키아가 깨워 드릴게요.</string>
+    <string name="alarm_toggle_description">%1$s 알람 사용</string>
+    <string name="saved_alarm_permission">알람은 저장됐습니다. 정확한 알람 권한을 허용해 주세요.</string>
+    <string name="edit">편집</string>
+    <string name="delete">삭제</string>
+    <string name="delete_alarm_title">알람 삭제</string>
+    <string name="delete_alarm_message">%1$s 알람을 삭제할까요?</string>
+    <string name="alarm_label_hint">알람 이름</string>
+    <string name="default_alarm_label">좋은 아침</string>
+    <string name="repeat_days_optional">반복 요일 · 선택하지 않으면 한 번</string>
+    <string name="repeat_once">한 번</string>
+    <string name="repeat_daily">매일</string>
+    <string name="new_alarm">새 알람</string>
+    <string name="edit_alarm">알람 편집</string>
+    <string name="save">저장</string>
+    <string name="saved_alarm_needs_permission">저장 완료. 정확한 알람 권한을 허용하면 예약됩니다.</string>
+    <string-array name="weekday_names">
+        <item>월</item><item>화</item><item>수</item><item>목</item><item>금</item><item>토</item><item>일</item>
+    </string-array>
+    <string name="settings_page_title">내 취향의 스키아</string>
+    <string name="settings_page_subtitle">시계 모양은 홈 화면 위젯에도 반영돼요.</string>
+    <string name="appearance">시계 모양</string>
+    <string name="show_background">배경 표시</string>
+    <string name="show_ticks">눈금 표시</string>
+    <string name="show_numbers">숫자 표시</string>
+    <string name="twenty_four_hour">24시간 표시</string>
+    <string name="sound_vibration">소리와 진동</string>
+    <string name="alarm_volume">알람 소리</string>
+    <string name="device_alarm_volume_note">기기의 알람 음량도 함께 적용됩니다.</string>
+    <string name="touch_volume">터치 효과음</string>
+    <string name="alarm_vibration">알람 진동</string>
+    <string name="alarm_sound_default">알람음: 스키아 기본 음성</string>
+    <string name="alarm_sound_custom">알람음: 선택한 오디오 파일</string>
+    <string name="choose_alarm_sound">알람 음성 파일 선택</string>
+    <string name="reset_alarm_sound">기본 알람음으로 되돌리기</string>
+    <string name="language">언어</string>
+    <string name="language_auto">시스템 기본</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_en">English</string>
+    <string name="settings_footer">스키아 시계 1.1 · Android\n위젯은 시계만 표시하고 보이지 않는 입력 영역을 누르면 캐릭터가 바로 반응합니다. 알람은 최대 10분간 울립니다.</string>
+    <string name="alarm_status">알람 준비 상태</string>
+    <string name="exact_alarm_available">✓ 정확한 시간에 알람 예약 가능</string>
+    <string name="exact_alarm_permission_needed">정확한 알람 권한이 필요해요</string>
+    <string name="allow_exact_alarm">정확한 알람 허용</string>
+    <string name="allow_alarm_notifications">알람 알림 허용</string>
+    <string name="allow_lock_screen_alarm">잠금 화면 알람 허용</string>
+    <string name="widget_manual_add_hint">홈 화면을 길게 누른 뒤 위젯 → 스키아 시계를 선택하세요.</string>
+    <string name="audio_file_unreadable">파일을 읽을 수 없습니다. 다른 오디오 파일을 선택해 주세요.</string>
+    <string name="alarm_notification_title">스키아 알람</string>
+    <string name="alarm_notification_body">%1$s · 일어날 시간이에요</string>
+    <string name="snooze_action">5분 후 다시</string>
+    <string name="stop_alarm_action">알람 끄기</string>
+    <string name="snooze_permission_needed">다시 울리려면 정확한 알람 권한이 필요합니다</string>
+    <string name="ring_screen_title">일어날 시간이에요</string>
+    <string name="ring_snooze">5분 후 다시 울리기</string>
+    <string name="ring_stop">알람 끄기</string>
+    <string name="widget_bonk_accessibility">머리 영역 꿀밤 애니메이션 실행</string>
+    <string name="widget_pat_accessibility">쓰다듬기 애니메이션 실행</string>
+    <string name="widget_cheek_accessibility">%1$s 방향으로 볼 당기기</string>
+    <string-array name="cheek_directions">
+        <item>오른쪽</item><item>오른쪽 아래 22.5도</item><item>오른쪽 아래</item><item>아래 오른쪽 22.5도</item>
+        <item>아래쪽</item><item>아래 왼쪽 22.5도</item><item>왼쪽 아래</item><item>왼쪽 아래 22.5도</item>
+        <item>왼쪽</item><item>왼쪽 위 22.5도</item><item>왼쪽 위</item><item>위 왼쪽 22.5도</item>
+        <item>위쪽</item><item>위 오른쪽 22.5도</item><item>오른쪽 위</item><item>오른쪽 위 22.5도</item>
+    </string-array>
 </resources>

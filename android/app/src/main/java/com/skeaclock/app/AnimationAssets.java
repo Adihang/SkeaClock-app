@@ -29,7 +29,9 @@ final class AnimationAssets {
     "skea_angry",
     "skea_angry_alt",
     "skea_panic",
-    "skea_blank"
+    "skea_blank",
+    "skea_pat_idle",
+    "skea_pat_end"
   };
 
   static final class Clip {

@@ -1,6 +1,7 @@
 package com.skeaclock.app;
 
 import java.time.*;
+import android.content.Context;
 import org.json.JSONObject;
 
 final class Alarm {
@@ -50,11 +51,11 @@ final class Alarm {
     return String.format(java.util.Locale.KOREA, "%02d:%02d", hour, minute);
   }
 
-  String repeat() {
-    if (days == 0) return "한 번";
-    if (days == 127) return "매일";
+  String repeat(Context context) {
+    if (days == 0) return context.getString(R.string.repeat_once);
+    if (days == 127) return context.getString(R.string.repeat_daily);
     StringBuilder s = new StringBuilder();
-    String[] names = {"월", "화", "수", "목", "금", "토", "일"};
+    String[] names = context.getResources().getStringArray(R.array.weekday_names);
     for (int i = 0; i < 7; i++) if ((days & (1 << i)) != 0) s.append(names[i]).append(' ');
     return s.toString().trim();
   }

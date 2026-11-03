@@ -12,6 +12,10 @@ import java.util.Random;
 public class ClockView extends View {
   interface Effects {
     void play(String name);
+
+    default void playAfter(String first, String next) {
+      play(first);
+    }
   }
 
   private enum Mode {
@@ -19,6 +23,8 @@ public class ClockView extends View {
     SMASH,
     TOUCH,
     RELEASE,
+    PAT,
+    PAT_END,
     PANIC
   }
 
@@ -31,8 +37,14 @@ public class ClockView extends View {
   private static final int TOUCH_BOUNCE_FRAMES = 6;
   private static final long ALARM_HAND_GATHER_MS = 100;
   private static final long CHEEK_PULL_RELEASE_MS = 480;
+  private static final long PAT_HOLD_MS = 200;
   private static final float CHARACTER_SCALE = 1.6f;
   private static final float DIAL_RADIUS = 216f;
+  private static final float PAT_WARP_RADIUS = 194.4f;
+  private static final float PAT_FOLLOW_FRACTION = .15f;
+  private static final int PAT_HEART_COUNT = 3;
+  private static final long PAT_HEART_SPAWN_MS = 650;
+  private static final long PAT_HEART_DURATION_MS = 1200;
   // The generated widget dial mask spans pixels 12 through 468 in a 480px canvas.
   private static final float WIDGET_DIAL_RADIUS = 228f;
   private static final int ROWS = 24, COLS = 24, STAR_COUNT = 6;
@@ -54,19 +66,33 @@ public class ClockView extends View {
       smash,
       angry,
       angryAlt,
-      panic;
+      panic,
+      patIdle,
+      patEnd;
   private final Bitmap hourHand, minuteHand;
   private final Bitmap widgetIdleFrame;
+  private final Bitmap patFrameBitmap;
+  private final Canvas patFrameCanvas;
   private final Bitmap touchComposite, releaseComposite, touchHeadBitmap, releaseHeadBitmap;
   private final Canvas touchCompositeCanvas, releaseCompositeCanvas, touchHeadCanvas, releaseHeadCanvas;
+  private final Paint heartPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
   private final float[] mesh = new float[(ROWS + 1) * (COLS + 1) * 2];
   private final float[] starX = new float[STAR_COUNT], starY = new float[STAR_COUNT];
   private final float[] starVx = new float[STAR_COUNT], starVy = new float[STAR_COUNT];
   private final float[] starGravity = new float[STAR_COUNT], starSize = new float[STAR_COUNT];
   private final float[] starDelay = new float[STAR_COUNT], starRotation = new float[STAR_COUNT];
+  private final float[] heartX = new float[PAT_HEART_COUNT], heartY = new float[PAT_HEART_COUNT];
+  private final float[] heartRadius = new float[PAT_HEART_COUNT];
+  private final long[] heartStarted = new long[PAT_HEART_COUNT];
+  private final boolean[] heartActive = new boolean[PAT_HEART_COUNT];
   private long stateStarted = SystemClock.uptimeMillis(), idleOffset, handReturnStarted, smashAt;
   private long idleSoundAt = Long.MAX_VALUE;
   private float pullX, pullY, releasePullX, releasePullY, lastTouchX, lastTouchY;
+  private float patPullX, patPullY, patReleasePullX, patReleasePullY;
+  private float headPressX, headPressY, headPressTolerance;
+  private long headPressStarted;
+  private long nextHeartSpawnAt;
+  private boolean headPressPending;
   private int releaseLandmarkFrame;
   private float handReturnFromHour = .5f, handReturnFromMinute = .5f;
   private boolean handReturn,
@@ -79,6 +105,10 @@ public class ClockView extends View {
   private Effects effects;
   private Runnable interactionListener;
   private final Random random = new Random();
+  private final Runnable patHold =
+      () -> {
+        if (headPressPending && mode == Mode.IDLE) startPat(headPressX, headPressY);
+      };
 
   public ClockView(Context context) {
     this(context, false);
@@ -127,9 +157,19 @@ public class ClockView extends View {
     angry = clip("skea_angry");
     angryAlt = clip("skea_angry_alt");
     panic = clip("skea_panic");
+    patIdle = clip("skea_pat_idle");
+    patEnd = clip("skea_pat_end");
     hourHand = decode(R.drawable.hour_hand);
     minuteHand = decode(R.drawable.minute_hand);
     widgetIdleFrame = widgetRenderer ? decode(R.drawable.widget_idle_frame) : null;
+    if (patIdle != null) {
+      patFrameBitmap = Bitmap.createBitmap(patIdle.width, patIdle.height, Bitmap.Config.ARGB_8888);
+      patFrameCanvas = new Canvas(patFrameBitmap);
+    } else {
+      patFrameBitmap = null;
+      patFrameCanvas = null;
+    }
+    heartPaint.setStyle(Paint.Style.FILL);
     if (touchBack != null) {
       touchComposite =
           Bitmap.createBitmap(touchBack.width, touchBack.height, Bitmap.Config.ARGB_8888);
@@ -154,7 +194,7 @@ public class ClockView extends View {
       touchCompositeCanvas = releaseCompositeCanvas = touchHeadCanvas = releaseHeadCanvas = null;
     }
     setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-    setContentDescription("스키아 시계. 가운데를 눌러 반응을 보고 볼을 끌어당기세요.");
+    setContentDescription(context.getString(R.string.clock_content_description));
     setClickable(true);
     if (ringing) {
       mode = Mode.PANIC;
@@ -170,6 +210,8 @@ public class ClockView extends View {
           new String[] {
             "skea_idle", "skea_transition", "skea_smash", "skea_angry", "skea_angry_alt"
           };
+    if (MainActivity.WIDGET_PAT.equals(action))
+      return new String[] {"skea_idle", "skea_pat_idle", "skea_pat_end"};
     return
         new String[] {
           "skea_idle",
@@ -186,12 +228,15 @@ public class ClockView extends View {
 
   private static String[] widgetEagerClips(String action) {
     if (MainActivity.WIDGET_BONK.equals(action)) return new String[] {"skea_smash"};
+    if (MainActivity.WIDGET_PAT.equals(action)) return new String[] {"skea_pat_idle"};
     return new String[] {"skea_touch_back", "skea_touch_head", "skea_touch_front"};
   }
 
   void preloadWidgetAnimationRemainder(String action) {
     if (MainActivity.WIDGET_BONK.equals(action)) {
       assets.preload("skea_angry", "skea_angry_alt", "skea_transition");
+    } else if (MainActivity.WIDGET_PAT.equals(action)) {
+      assets.preload("skea_pat_end");
     } else {
       assets.preload(
           "skea_touch_end",
@@ -273,6 +318,16 @@ public class ClockView extends View {
     triggerCheekPull(directionX, directionY, false);
   }
 
+  void triggerWidgetPat() {
+    startPat(240, 240);
+    long started = stateStarted;
+    postDelayed(
+        () -> {
+          if (mode == Mode.PAT && stateStarted == started) finishPat();
+        },
+        1000);
+  }
+
   void finishWidgetCheekPull() {
     if (mode == Mode.TOUCH) finishTouch();
   }
@@ -302,6 +357,8 @@ public class ClockView extends View {
 
   private void startSmash(float x, float y) {
     if (mode == Mode.PANIC) return;
+    removeCallbacks(patHold);
+    headPressPending = false;
     notifyInteraction();
     mode = Mode.SMASH;
     transitionHandsStarted = false;
@@ -327,6 +384,47 @@ public class ClockView extends View {
     invalidate();
   }
 
+  private void startPat(float x, float y) {
+    if (mode == Mode.PANIC || patIdle == null || patEnd == null) return;
+    removeCallbacks(patHold);
+    headPressPending = false;
+    notifyInteraction();
+    mode = Mode.PAT;
+    stateStarted = SystemClock.uptimeMillis();
+    idleOffset = 0;
+    handReturn = false;
+    patPullX = patPullY = patReleasePullX = patReleasePullY = 0;
+    java.util.Arrays.fill(heartActive, false);
+    nextHeartSpawnAt = stateStarted;
+    updatePatPull(x, y);
+    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+    if (effects != null) effects.play("pat_start");
+    invalidate();
+  }
+
+  private void updatePatPull(float x, float y) {
+    float dx = x - 240, dy = y - 240;
+    float distance = (float) Math.hypot(dx, dy);
+    if (distance > PAT_WARP_RADIUS) {
+      dx *= PAT_WARP_RADIUS / distance;
+      dy *= PAT_WARP_RADIUS / distance;
+    }
+    patPullX = dx * PAT_FOLLOW_FRACTION;
+    patPullY = dy * PAT_FOLLOW_FRACTION;
+  }
+
+  private void finishPat() {
+    if (mode != Mode.PAT) return;
+    mode = Mode.PAT_END;
+    stateStarted = SystemClock.uptimeMillis();
+    patReleasePullX = patPullX;
+    patReleasePullY = patPullY;
+    patPullX = patPullY = 0;
+    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+    if (effects != null) effects.playAfter("pat_end", "pat" + (random.nextInt(3) + 1));
+    invalidate();
+  }
+
   private void finishTouch() {
     releaseLandmarkFrame = touchBack.frameAt(SystemClock.uptimeMillis() - stateStarted);
     mode = Mode.RELEASE;
@@ -335,7 +433,7 @@ public class ClockView extends View {
     releasePullY = pullY;
     pullX = pullY = 0;
     if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
-    if (effects != null) effects.play("touch_end");
+    if (effects != null) effects.playAfter("touch_end", "touch" + (random.nextInt(3) + 1));
     invalidate();
   }
 
@@ -385,6 +483,7 @@ public class ClockView extends View {
     c.restore();
     drawMarkers(c, widgetFrame);
     drawStars(c, now);
+    drawPatHearts(c, now);
   }
 
   private int reactionStage(long elapsed) {
@@ -486,6 +585,19 @@ public class ClockView extends View {
           drawIdle(c, 0, widgetFrame);
         }
         break;
+      case PAT:
+        drawPat(c, elapsed);
+        break;
+      case PAT_END:
+        if (elapsed >= patEnd.duration()) {
+          mode = Mode.IDLE;
+          stateStarted = now;
+          idleOffset = 0;
+          patReleasePullX = patReleasePullY = 0;
+          idleSoundAt = now + 350;
+          drawIdle(c, 0, widgetFrame);
+        } else drawMovie(c, patEnd, elapsed, 0, 0);
+        break;
       case PANIC:
         long panicElapsed = Math.max(0, elapsed - ALARM_HAND_GATHER_MS);
         drawMovie(c, panic, panicElapsed, 76, -64);
@@ -513,6 +625,73 @@ public class ClockView extends View {
   private void drawIdle(Canvas c, long time, boolean widgetFrame) {
     if (widgetFrame && widgetIdleFrame != null) c.drawBitmap(widgetIdleFrame, 0, 0, paint);
     else drawMovie(c, idle, time, 0, 0);
+  }
+
+  private void drawPat(Canvas canvas, long elapsed) {
+    if (patFrameCanvas == null || patFrameBitmap == null) return;
+    patFrameBitmap.eraseColor(Color.TRANSPARENT);
+    patIdle.draw(getContext(), patFrameCanvas, elapsed, 0, 0, paint);
+    float left = 240 - idle.centers[0][0] * CHARACTER_SCALE;
+    float top = 240 - idle.centers[0][1] * CHARACTER_SCALE;
+    float centerX = idle.centers[0][0], centerY = idle.centers[0][1];
+    float sourcePullX = patPullX / CHARACTER_SCALE;
+    float sourcePullY = patPullY / CHARACTER_SCALE;
+    float radius = PAT_WARP_RADIUS / CHARACTER_SCALE;
+    for (int row = 0; row <= ROWS; row++) {
+      for (int col = 0; col <= COLS; col++) {
+        float sx = patFrameBitmap.getWidth() * col / (float) COLS;
+        float sy = patFrameBitmap.getHeight() * row / (float) ROWS;
+        float dx = (sx - centerX) / radius, dy = (sy - centerY) / radius;
+        float falloff = Math.max(0, 1 - dx * dx - dy * dy);
+        float weight = falloff * falloff;
+        int at = (row * (COLS + 1) + col) * 2;
+        mesh[at] = sx + sourcePullX * weight;
+        mesh[at + 1] = sy + sourcePullY * weight;
+      }
+    }
+    canvas.save();
+    canvas.translate(left, top);
+    canvas.scale(CHARACTER_SCALE, CHARACTER_SCALE);
+    canvas.drawBitmapMesh(patFrameBitmap, COLS, ROWS, mesh, 0, null, 0, paint);
+    canvas.restore();
+  }
+
+  private void drawPatHearts(Canvas canvas, long now) {
+    if (mode == Mode.PAT && now >= nextHeartSpawnAt) {
+      for (int i = 0; i < heartActive.length; i++) {
+        if (heartActive[i] && now - heartStarted[i] >= PAT_HEART_DURATION_MS)
+          heartActive[i] = false;
+      }
+      for (int i = 0; i < heartActive.length; i++) {
+        if (heartActive[i]) continue;
+        float angle = random.nextFloat() * (float) (Math.PI * 2);
+        float radial = (float) Math.sqrt(random.nextFloat());
+        heartX[i] = 240 + (float) Math.sin(angle) * radial * 145.8f;
+        heartY[i] = 240 - (float) Math.cos(angle) * radial * 64.8f;
+        heartRadius[i] = 35f * (.75f + .5f * random.nextFloat());
+        heartStarted[i] = now;
+        heartActive[i] = true;
+        nextHeartSpawnAt = now + PAT_HEART_SPAWN_MS;
+        break;
+      }
+    }
+    for (int i = 0; i < heartActive.length; i++) {
+      if (!heartActive[i]) continue;
+      long elapsed = now - heartStarted[i];
+      if (elapsed >= PAT_HEART_DURATION_MS) {
+        heartActive[i] = false;
+        continue;
+      }
+      float alpha = elapsed < 400 ? elapsed / 400f : 1 - (elapsed - 400) / 800f;
+      heartPaint.setColor(Color.argb(Math.round(255 * alpha), 255, 95, 145));
+      float x = heartX[i], y = heartY[i] - elapsed * .088f, radius = heartRadius[i];
+      Path heart = new Path();
+      heart.moveTo(x, y + radius * .75f);
+      heart.cubicTo(x - radius * 1.4f, y - radius * .1f, x - radius * .8f, y - radius * 1.3f, x, y - radius * .45f);
+      heart.cubicTo(x + radius * .8f, y - radius * 1.3f, x + radius * 1.4f, y - radius * .1f, x, y + radius * .75f);
+      heart.close();
+      canvas.drawPath(heart, heartPaint);
+    }
   }
 
   private void drawMovie(
@@ -645,8 +824,17 @@ public class ClockView extends View {
     // drawMovie normalizes each idle frame's animated center onto (240, 240).
     // Keep both hands on that same registered pivot instead of applying the
     // source-frame center delta a second time.
-    drawHand(c, hourHand, 240, 240, hour, 145 * .9f * lengthFactor(0));
-    drawHand(c, minuteHand, 240, 240, minute, 169 * .9f * lengthFactor(1));
+    float centerX = 240, centerY = 240;
+    if (mode == Mode.PAT) {
+      centerX += patPullX;
+      centerY += patPullY;
+    } else if (mode == Mode.PAT_END) {
+      float returnProgress = ease(elapsed / 250f);
+      centerX += patReleasePullX * (1 - returnProgress);
+      centerY += patReleasePullY * (1 - returnProgress);
+    }
+    drawHand(c, hourHand, centerX, centerY, hour, 145 * .9f * lengthFactor(0));
+    drawHand(c, minuteHand, centerX, centerY, minute, 169 * .9f * lengthFactor(1));
   }
 
   private float lengthFactor(int i) {
@@ -789,6 +977,8 @@ public class ClockView extends View {
               : stage == 1 ? angry : stage == 2 ? angryAlt : stage == 3 ? transition : idle;
     } else if (mode == Mode.TOUCH) current = touchBack;
     else if (mode == Mode.RELEASE) current = touchEnd;
+    else if (mode == Mode.PAT) current = patIdle;
+    else if (mode == Mode.PAT_END) current = patEnd;
     else if (mode == Mode.PANIC) current = panic;
     int frame =
         current.frameAt(
@@ -827,6 +1017,19 @@ public class ClockView extends View {
     return true;
   }
 
+  private boolean performClickAt(float x, float y) {
+    super.performClick();
+    startSmash(x, y);
+    return true;
+  }
+
+  private boolean isHeadTouch(float x, float y) {
+    float dx = (x - 240) / 97.2f, dy = (y - 240) / 64.8f;
+    return dx * dx + dy * dy <= 1;
+  }
+
+  // Head taps preserve their contact point; hold and drag gestures are handled here instead.
+  @android.annotation.SuppressLint("ClickableViewAccessibility")
   @Override
   public boolean onTouchEvent(MotionEvent event) {
     float size = Math.min(getWidth(), getHeight());
@@ -835,8 +1038,15 @@ public class ClockView extends View {
         y = (event.getY() - (getHeight() - size) / 2f) * 480f / size;
     if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
       if (mode == Mode.PANIC) return true;
-      if (Math.hypot(x - 240, y - 240) <= 65) {
-        performClick();
+      if (mode != Mode.IDLE) return true;
+      if (isHeadTouch(x, y)) {
+        headPressPending = true;
+        headPressX = x;
+        headPressY = y;
+        headPressStarted = SystemClock.uptimeMillis();
+        headPressTolerance = 5f * getResources().getDisplayMetrics().density * 480f / size;
+        postDelayed(patHold, PAT_HOLD_MS);
+        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
         return true;
       }
       float centerX = 240 + (transition.pointX - idle.centers[0][0]) * CHARACTER_SCALE;
@@ -846,6 +1056,40 @@ public class ClockView extends View {
         return true;
       }
       return false;
+    }
+    if (headPressPending && event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+      if (Math.hypot(x - headPressX, y - headPressY) > headPressTolerance) {
+        startPat(x, y);
+      }
+      return true;
+    }
+    if (mode == Mode.PAT && event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+      updatePatPull(x, y);
+      invalidate();
+      return true;
+    }
+    if (headPressPending
+        && (event.getActionMasked() == MotionEvent.ACTION_UP
+            || event.getActionMasked() == MotionEvent.ACTION_CANCEL)) {
+      removeCallbacks(patHold);
+      headPressPending = false;
+      if (event.getActionMasked() == MotionEvent.ACTION_UP
+          && SystemClock.uptimeMillis() - headPressStarted < PAT_HOLD_MS
+          && Math.hypot(x - headPressX, y - headPressY) <= headPressTolerance) {
+        if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+        return performClickAt(headPressX, headPressY);
+      }
+      if (event.getActionMasked() == MotionEvent.ACTION_UP && mode == Mode.IDLE)
+        startPat(x, y);
+      if (mode == Mode.PAT) finishPat();
+      else if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+      return true;
+    }
+    if (mode == Mode.PAT
+        && (event.getActionMasked() == MotionEvent.ACTION_UP
+            || event.getActionMasked() == MotionEvent.ACTION_CANCEL)) {
+      finishPat();
+      return true;
     }
     if (mode == Mode.TOUCH && event.getActionMasked() == MotionEvent.ACTION_MOVE) {
       pullX = (x - lastTouchX) / CHARACTER_SCALE;
@@ -868,5 +1112,12 @@ public class ClockView extends View {
             || event.getActionMasked() == MotionEvent.ACTION_CANCEL)
         && getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
     return true;
+  }
+
+  @Override
+  protected void onDetachedFromWindow() {
+    removeCallbacks(patHold);
+    if (mode == Mode.PAT) finishPat();
+    super.onDetachedFromWindow();
   }
 }

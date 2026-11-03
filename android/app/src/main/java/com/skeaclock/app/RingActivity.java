@@ -34,6 +34,11 @@ public class RingActivity extends Activity {
   }
 
   @Override
+  protected void attachBaseContext(Context newBase) {
+    super.attachBaseContext(LocaleHelper.onAttach(newBase));
+  }
+
+  @Override
   protected void onNewIntent(Intent i) {
     super.onNewIntent(i);
     setIntent(i);
@@ -48,7 +53,7 @@ public class RingActivity extends Activity {
     box.setBackgroundColor(0xfff7f9f5);
     Alarm a = Store.find(this, getIntent().getIntExtra("id", -1));
     TextView title = new TextView(this);
-    title.setText(a == null ? "일어날 시간이에요" : a.label + "\n" + a.time());
+    title.setText(a == null ? getString(R.string.ring_screen_title) : a.label + "\n" + a.time());
     title.setTextSize(32);
     title.setGravity(Gravity.CENTER);
     box.addView(title);
@@ -56,11 +61,11 @@ public class RingActivity extends Activity {
     clock.setInteractionListener(() -> AlarmService.stopForClockInteraction(this));
     box.addView(clock, new LinearLayout.LayoutParams(-1, 0, 1));
     Button snooze = new Button(this);
-    snooze.setText("5분 후 다시 울리기");
+    snooze.setText(R.string.ring_snooze);
     snooze.setOnClickListener(v -> command("SNOOZE"));
     box.addView(snooze, new LinearLayout.LayoutParams(-1, 64));
     Button stop = new Button(this);
-    stop.setText("알람 끄기");
+    stop.setText(R.string.ring_stop);
     stop.setOnClickListener(v -> command("STOP"));
     box.addView(stop, new LinearLayout.LayoutParams(-1, 64));
     setContentView(box);

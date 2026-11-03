@@ -65,7 +65,8 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
     final float y = intent.getFloatExtra(EXTRA_Y, 0f);
     if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID
         || (!MainActivity.WIDGET_BONK.equals(action)
-            && !MainActivity.WIDGET_CHEEK.equals(action))) {
+            && !MainActivity.WIDGET_CHEEK.equals(action)
+            && !MainActivity.WIDGET_PAT.equals(action))) {
       pending.finish();
       return;
     }
@@ -92,7 +93,8 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
       Context context, int widgetId, String action, float x, float y, PendingResult pending) {
     if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID
         || (!MainActivity.WIDGET_BONK.equals(action)
-            && !MainActivity.WIDGET_CHEEK.equals(action))) {
+            && !MainActivity.WIDGET_CHEEK.equals(action)
+            && !MainActivity.WIDGET_PAT.equals(action))) {
       releaseWidget(widgetId);
       pending.finish();
       return;
@@ -157,7 +159,18 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
             Store.prefs(context).getBoolean("background", true),
             Store.prefs(context).getBoolean("ticks", true),
             Store.prefs(context).getBoolean("numbers", true));
-        clock.setEffects(this::playEffect);
+        clock.setEffects(
+            new ClockView.Effects() {
+              @Override
+              public void play(String name) {
+                playEffect(name);
+              }
+
+              @Override
+              public void playAfter(String first, String next) {
+                playEffectAfter(first, next);
+              }
+            });
         int measure = View.MeasureSpec.makeMeasureSpec(VIEW_SIZE, View.MeasureSpec.EXACTLY);
         clock.measure(measure, measure);
         clock.layout(0, 0, VIEW_SIZE, VIEW_SIZE);
@@ -166,6 +179,7 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
         float scale = FRAME_SIZE / (float) VIEW_SIZE;
         frameCanvas.scale(scale, scale);
         if (MainActivity.WIDGET_BONK.equals(action)) clock.triggerSmash(x, y);
+        else if (MainActivity.WIDGET_PAT.equals(action)) clock.triggerWidgetPat();
         else clock.triggerWidgetCheekPull(x, y);
         startedAt = SystemClock.uptimeMillis();
         drawFrame();
@@ -224,21 +238,30 @@ public final class WidgetActionReceiver extends BroadcastReceiver {
     private void playEffect(String name) {
       AUDIO.post(
           () -> {
-            int resource =
-                context.getResources().getIdentifier(name, "raw", context.getPackageName());
-            if (resource == 0) return;
-            releasePlayerNow();
-            player = MediaPlayer.create(context, resource);
-            if (player == null) return;
-            float volume = Store.prefs(context).getInt("effects", 80) / 100f;
-            player.setVolume(volume, volume);
-            player.setOnCompletionListener(
-                completed -> {
-                  completed.release();
-                  if (player == completed) player = null;
-                });
-            player.start();
+            playEffectNow(name, null);
           });
+    }
+
+    private void playEffectAfter(String first, String next) {
+      AUDIO.post(() -> playEffectNow(first, next));
+    }
+
+    private void playEffectNow(String name, String next) {
+      int resource =
+          context.getResources().getIdentifier(name, "raw", context.getPackageName());
+      if (resource == 0) return;
+      releasePlayerNow();
+      player = MediaPlayer.create(context, resource);
+      if (player == null) return;
+      float volume = Store.prefs(context).getInt("effects", 80) / 100f;
+      player.setVolume(volume, volume);
+      player.setOnCompletionListener(
+          completed -> {
+            completed.release();
+            if (player == completed) player = null;
+            if (next != null && !finished) playEffectNow(next, null);
+          });
+      player.start();
     }
 
     void finish(boolean restoreWidget) {

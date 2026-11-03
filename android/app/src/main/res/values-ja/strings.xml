@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">スキア時計</string>
+    <string name="widget_description">時計のみを表示します。透明な5×5タッチ領域で、ぽかぽかと頬引っ張りを操作できます。</string>
+    <string name="widget_cover_label">スキア時計 カバーウィジェット</string>
+    <string name="widget_cover_description">Z Flipのカバー画面に時計のみを表示し、透明な5×5領域でキャラクターを操作できます。</string>
+    <string name="date_format">M月d日 EEE</string>
+    <string name="next_alarm_date_format">M月d日 HH:mm</string>
+    <string name="tab_clock">時計</string>
+    <string name="tab_alarm">アラーム</string>
+    <string name="tab_settings">設定</string>
+    <string name="clock_content_description">スキア時計。頭を短くタップするとぽかぽか、長押しまたはドラッグでなでる、頬を引っ張ると反応します。</string>
+    <string name="widget_dial_background">時計の文字盤</string>
+    <string name="widget_idle_character">アニメーションするキャラクター</string>
+    <string name="widget_markers">時計の目盛りと数字</string>
+    <string name="widget_interaction_grid">時計上の透明な5×5操作領域</string>
+    <string name="slider_value">%1$s  %2$d%%</string>
+    <string name="clock_page_title">スキアと過ごす時間</string>
+    <string name="clock_tagline">今日もアホ毛は正確です。</string>
+    <string name="clock_tip">頭をタップしてぽかぽか、長押しやドラッグでなでる、頬を引っ張って反応を見てみましょう。</string>
+    <string name="upcoming_alarm">次のアラーム</string>
+    <string name="no_upcoming_alarm">今日はゆっくり過ごせそうです。必要ならアラームを追加しましょう。</string>
+    <string name="exact_alarm_required">予約するには正確なアラームの権限が必要です。</string>
+    <string name="manage_alarms">アラームを管理</string>
+    <string name="add_clock_widget">ホーム画面に時計ウィジェットを追加</string>
+    <string name="alarm_page_title">気持ちのよい朝を予約</string>
+    <string name="alarm_page_subtitle">アラームの時刻と繰り返し曜日をアプリで管理します。</string>
+    <string name="add_alarm">+ アラームを追加</string>
+    <string name="no_alarms">アラームはまだありません</string>
+    <string name="first_alarm_hint">最初のアラームを追加すると、スキアが起こしてくれます。</string>
+    <string name="alarm_toggle_description">%1$sのアラームを有効にする</string>
+    <string name="saved_alarm_permission">アラームを保存しました。予約するには正確なアラームを許可してください。</string>
+    <string name="edit">編集</string>
+    <string name="delete">削除</string>
+    <string name="delete_alarm_title">アラームを削除</string>
+    <string name="delete_alarm_message">%1$sのアラームを削除しますか？</string>
+    <string name="alarm_label_hint">アラーム名</string>
+    <string name="default_alarm_label">おはよう</string>
+    <string name="repeat_days_optional">繰り返す曜日 · 選択しない場合は一度だけ</string>
+    <string name="repeat_once">一度だけ</string>
+    <string name="repeat_daily">毎日</string>
+    <string name="new_alarm">新しいアラーム</string>
+    <string name="edit_alarm">アラームを編集</string>
+    <string name="save">保存</string>
+    <string name="saved_alarm_needs_permission">保存しました。予約するには正確なアラームを許可してください。</string>
+    <string-array name="weekday_names">
+        <item>月</item><item>火</item><item>水</item><item>木</item><item>金</item><item>土</item><item>日</item>
+    </string-array>
+    <string name="settings_page_title">スキアをカスタマイズ</string>
+    <string name="settings_page_subtitle">時計の外観はホーム画面のウィジェットにも反映されます。</string>
+    <string name="appearance">時計の外観</string>
+    <string name="show_background">背景を表示</string>
+    <string name="show_ticks">目盛りを表示</string>
+    <string name="show_numbers">数字を表示</string>
+    <string name="twenty_four_hour">24時間表示</string>
+    <string name="sound_vibration">音と振動</string>
+    <string name="alarm_volume">アラーム音量</string>
+    <string name="device_alarm_volume_note">端末のアラーム音量も適用されます。</string>
+    <string name="touch_volume">操作音</string>
+    <string name="alarm_vibration">アラームの振動</string>
+    <string name="alarm_sound_default">アラーム音：スキアの標準ボイス</string>
+    <string name="alarm_sound_custom">アラーム音：選択した音声ファイル</string>
+    <string name="choose_alarm_sound">アラーム音声を選択</string>
+    <string name="reset_alarm_sound">標準のアラーム音に戻す</string>
+    <string name="language">言語</string>
+    <string name="language_auto">システム設定</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_en">English</string>
+    <string name="settings_footer">スキア時計 1.1 · Android\nウィジェットには時計のみが表示され、透明なタッチ領域でスキアを操作できます。アラームは最大10分間鳴ります。</string>
+    <string name="alarm_status">アラームの準備状況</string>
+    <string name="exact_alarm_available">✓ 正確な時刻にアラームを予約できます</string>
+    <string name="exact_alarm_permission_needed">正確なアラームの権限が必要です</string>
+    <string name="allow_exact_alarm">正確なアラームを許可</string>
+    <string name="allow_alarm_notifications">アラーム通知を許可</string>
+    <string name="allow_lock_screen_alarm">ロック画面でのアラームを許可</string>
+    <string name="widget_manual_add_hint">ホーム画面を長押しして、ウィジェット → スキア時計を選択してください。</string>
+    <string name="audio_file_unreadable">ファイルを読み込めません。別の音声ファイルを選択してください。</string>
+    <string name="alarm_notification_title">スキアのアラーム</string>
+    <string name="alarm_notification_body">%1$s · 起きる時間です</string>
+    <string name="snooze_action">5分後に再通知</string>
+    <string name="stop_alarm_action">アラームを停止</string>
+    <string name="snooze_permission_needed">スヌーズには正確なアラームの権限が必要です。</string>
+    <string name="ring_screen_title">起きる時間です</string>
+    <string name="ring_snooze">5分後に再通知</string>
+    <string name="ring_stop">アラームを停止</string>
+    <string name="widget_bonk_accessibility">頭の領域のぽかぽかアニメーションを実行</string>
+    <string name="widget_pat_accessibility">なでるアニメーションを実行</string>
+    <string name="widget_cheek_accessibility">%1$s方向に頬を引っ張る</string>
+    <string-array name="cheek_directions">
+        <item>右</item><item>右下22.5度</item><item>右下</item><item>右下67.5度</item>
+        <item>下</item><item>左下112.5度</item><item>左下</item><item>左下157.5度</item>
+        <item>左</item><item>左上202.5度</item><item>左上</item><item>左上247.5度</item>
+        <item>上</item><item>右上292.5度</item><item>右上</item><item>右上337.5度</item>
+    </string-array>
+</resources>

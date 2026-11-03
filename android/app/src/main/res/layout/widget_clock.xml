@@ -8,7 +8,7 @@
         android:id="@+id/widget_face"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:contentDescription="스키아 시계">
+        android:contentDescription="@string/app_name">
 
         <FrameLayout
             android:id="@+id/widget_dial_area"
@@ -23,7 +23,7 @@
                 android:adjustViewBounds="true"
                 android:src="@drawable/widget_background_7"
                 android:scaleType="fitCenter"
-                android:contentDescription="시계 배경" />
+                android:contentDescription="@string/widget_dial_background" />
 
             <ImageView
                 android:id="@+id/widget_idle_character"
@@ -31,7 +31,7 @@
                 android:layout_height="match_parent"
                 android:src="@drawable/widget_idle"
                 android:scaleType="fitCenter"
-                android:contentDescription="흔들리는 캐릭터" />
+                android:contentDescription="@string/widget_idle_character" />
 
             <ImageView
                 android:id="@+id/dial_markers"
@@ -39,7 +39,7 @@
                 android:layout_height="match_parent"
                 android:src="@drawable/widget_markers_7"
                 android:scaleType="fitCenter"
-                android:contentDescription="시계 눈금과 숫자" />
+                android:contentDescription="@string/widget_markers" />
 
             <AnalogClock
                 android:id="@+id/hands"
@@ -56,7 +56,7 @@
                 android:columnCount="5"
                 android:rowCount="5"
                 android:orientation="horizontal"
-                android:contentDescription="시계 위 투명한 5×5 방향 입력">
+                android:contentDescription="@string/widget_interaction_grid">
 
                 <TextView android:id="@+id/widget_r0c0" style="@style/WidgetTouchTarget" android:layout_row="0" android:layout_column="0" />
                 <TextView android:id="@+id/widget_r0c1" style="@style/WidgetTouchTarget" android:layout_row="0" android:layout_column="1" />

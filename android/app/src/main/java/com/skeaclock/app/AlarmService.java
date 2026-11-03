@@ -34,8 +34,11 @@ public class AlarmService extends Service {
     String action = intent.getAction();
     if ("STOP".equals(action) || "SNOOZE".equals(action)) {
       if ("SNOOZE".equals(action) && activeId != -1 && !Scheduler.snooze(this, activeId)) {
+        Context localized = LocaleHelper.onAttach(this);
         android.widget.Toast.makeText(
-                this, "다시 울리려면 정확한 알람 권한이 필요합니다", android.widget.Toast.LENGTH_LONG)
+                localized,
+                localized.getString(R.string.snooze_permission_needed),
+                android.widget.Toast.LENGTH_LONG)
             .show();
         return START_NOT_STICKY;
       }
@@ -48,11 +51,13 @@ public class AlarmService extends Service {
       stopSelf();
       return START_NOT_STICKY;
     }
+    Context localized = LocaleHelper.onAttach(this);
     NotificationManager nm = getSystemService(NotificationManager.class);
     NotificationChannel channel =
-        new NotificationChannel(CHANNEL, "알람", NotificationManager.IMPORTANCE_HIGH);
+        new NotificationChannel(
+            CHANNEL, localized.getString(R.string.tab_alarm), NotificationManager.IMPORTANCE_HIGH);
     channel.setSound(null, null);
-    channel.setDescription("설정한 시간의 알람과 해제 버튼");
+    channel.setDescription(localized.getString(R.string.alarm_status));
     nm.createNotificationChannel(channel);
     PendingIntent open =
         PendingIntent.getActivity(
@@ -63,16 +68,24 @@ public class AlarmService extends Service {
     Notification notification =
         new Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_clock)
-            .setContentTitle(alarm.label.trim().isEmpty() ? "스키아 알람" : alarm.label)
-            .setContentText(alarm.time() + " · 일어날 시간이에요")
+            .setContentTitle(
+                alarm.label.trim().isEmpty()
+                    ? localized.getString(R.string.alarm_notification_title)
+                    : alarm.label)
+            .setContentText(localized.getString(R.string.alarm_notification_body, alarm.time()))
             .setCategory(Notification.CATEGORY_ALARM)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setContentIntent(open)
             .setFullScreenIntent(open, true)
             .addAction(
-                new Notification.Action.Builder(null, "5분 후 다시", action(this, "SNOOZE")).build())
-            .addAction(new Notification.Action.Builder(null, "알람 끄기", action(this, "STOP")).build())
+                new Notification.Action.Builder(
+                        null, localized.getString(R.string.snooze_action), action(this, "SNOOZE"))
+                    .build())
+            .addAction(
+                new Notification.Action.Builder(
+                        null, localized.getString(R.string.stop_alarm_action), action(this, "STOP"))
+                    .build())
             .build();
     startForeground(1001, notification);
     releaseAudio();

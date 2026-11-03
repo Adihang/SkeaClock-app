@@ -16,11 +16,11 @@ import android.view.*;
 import android.widget.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import androidx.preference.PreferenceManager;
 
 public class MainActivity extends Activity {
   static final String WIDGET_BONK = "bonk";
   static final String WIDGET_CHEEK = "cheek";
+  static final String WIDGET_PAT = "pat";
   private LinearLayout root, body, nav;
   private int tab = 0;
   private boolean resumed;
@@ -39,9 +39,11 @@ public class MainActivity extends Activity {
                         Store.prefs(MainActivity.this).getBoolean("24hour", true)
                             ? "HH:mm"
                             : "a h:mm",
-                        java.util.Locale.KOREAN)));
+                        LocaleHelper.locale(MainActivity.this))));
             date.setText(
-                now.format(DateTimeFormatter.ofPattern("M월 d일 EEEE", java.util.Locale.KOREAN)));
+                now.format(
+                    DateTimeFormatter.ofPattern(
+                        getString(R.string.date_format), LocaleHelper.locale(MainActivity.this))));
           }
           handler.postDelayed(this, 1000);
         }
@@ -181,7 +183,9 @@ public class MainActivity extends Activity {
     else settingsPage();
     nav = new LinearLayout(this);
     nav.setPadding(dp(12), dp(4), dp(12), dp(8));
-    String[] labels = {"시계", "알람", "설정"};
+    String[] labels = {
+      getString(R.string.tab_clock), getString(R.string.tab_alarm), getString(R.string.tab_settings)
+    };
     for (int i = 0; i < 3; i++) {
       final int index = i;
       Button b =
@@ -200,15 +204,26 @@ public class MainActivity extends Activity {
   }
 
   private void clockPage() {
-    body.addView(heading("스키아와 함께하는 시간", 26));
-    body.addView(text("바보털은 오늘도 정확하게.", 14, 0xff718079));
-    body.addView(text("가운데를 톡 눌러 꿀밤, 볼을 끌어당겨 반응을 확인해 보세요.", 13, 0xff718079));
+    body.addView(heading(getString(R.string.clock_page_title), 26));
+    body.addView(text(getString(R.string.clock_tagline), 14, 0xff718079));
+    body.addView(text(getString(R.string.clock_tip), 13, 0xff718079));
     clock = new ClockView(this);
     clock.setFace(
         Store.prefs(this).getBoolean("background", true),
         Store.prefs(this).getBoolean("ticks", true),
         Store.prefs(this).getBoolean("numbers", true));
-    clock.setEffects(this::playCharacterSound);
+    clock.setEffects(
+        new ClockView.Effects() {
+          @Override
+          public void play(String name) {
+            playCharacterSound(name);
+          }
+
+          @Override
+          public void playAfter(String first, String next) {
+            playCharacterSound(first, next);
+          }
+        });
     clock.setInteractionListener(() -> AlarmService.stopForClockInteraction(this));
     body.addView(clock, new LinearLayout.LayoutParams(-1, dp(300)));
     digital = heading("", 48);
@@ -219,7 +234,7 @@ public class MainActivity extends Activity {
     body.addView(date);
     tickNow();
     LinearLayout next = card();
-    next.addView(heading("다음 알람", 15));
+    next.addView(heading(getString(R.string.upcoming_alarm), 15));
     long earliest = Long.MAX_VALUE;
     Alarm upcoming = null;
     for (Alarm a : Store.alarms(this)) {
@@ -235,24 +250,26 @@ public class MainActivity extends Activity {
     next.addView(
         text(
             upcoming == null
-                ? "여유로운 하루예요. 알람을 추가해 보세요."
+                ? getString(R.string.no_upcoming_alarm)
                 : Instant.ofEpochMilli(earliest)
                         .atZone(ZoneId.systemDefault())
-                        .format(DateTimeFormatter.ofPattern("M월 d일 HH:mm"))
+                        .format(
+                            DateTimeFormatter.ofPattern(
+                                getString(R.string.next_alarm_date_format), LocaleHelper.locale(this)))
                     + " · "
                     + upcoming.label,
             16,
             0xff233b35));
     if (!Scheduler.allowed(this) && upcoming != null)
-      next.addView(text("정확한 알람 권한을 허용해야 예약됩니다.", 14, 0xffad522e));
+      next.addView(text(getString(R.string.exact_alarm_required), 14, 0xffad522e));
     next.addView(
         button(
-            "알람 관리",
+            getString(R.string.manage_alarms),
             () -> {
               tab = 1;
               render();
             }));
-    body.addView(button("홈 화면에 시계 위젯 추가", this::pinWidget));
+    body.addView(button(getString(R.string.add_clock_widget), this::pinWidget));
   }
 
   private void tickNow() {
@@ -262,12 +279,19 @@ public class MainActivity extends Activity {
           now.format(
               DateTimeFormatter.ofPattern(
                   Store.prefs(this).getBoolean("24hour", true) ? "HH:mm" : "a h:mm",
-                  java.util.Locale.KOREAN)));
-      date.setText(now.format(DateTimeFormatter.ofPattern("M월 d일 EEEE", java.util.Locale.KOREAN)));
+                  LocaleHelper.locale(this))));
+      date.setText(
+          now.format(
+              DateTimeFormatter.ofPattern(
+                  getString(R.string.date_format), LocaleHelper.locale(this))));
     }
   }
 
   private void playCharacterSound(String name) {
+    playCharacterSound(name, null);
+  }
+
+  private void playCharacterSound(String name, String next) {
     int id = getResources().getIdentifier(name, "raw", getPackageName());
     if (id == 0) return;
     if (effect != null) {
@@ -282,20 +306,21 @@ public class MainActivity extends Activity {
           player -> {
             player.release();
             if (effect == player) effect = null;
+            if (next != null && resumed) playCharacterSound(next);
           });
       effect.start();
     }
   }
 
   private void alarmPage() {
-    body.addView(heading("좋은 아침을 예약해요", 26));
-    body.addView(text("시간과 반복 요일을 앱에서 관리하세요.", 14, 0xff718079));
+    body.addView(heading(getString(R.string.alarm_page_title), 26));
+    body.addView(text(getString(R.string.alarm_page_subtitle), 14, 0xff718079));
     permissions();
-    body.addView(button("+ 알람 추가", () -> edit(null)));
+    body.addView(button(getString(R.string.add_alarm), () -> edit(null)));
     if (Store.alarms(this).isEmpty()) {
       LinearLayout empty = card();
-      empty.addView(heading("아직 알람이 없어요", 21));
-      empty.addView(text("첫 알람을 추가하면 스키아가 깨워 드릴게요.", 15, 0xff718079));
+      empty.addView(heading(getString(R.string.no_alarms), 21));
+      empty.addView(text(getString(R.string.first_alarm_hint), 15, 0xff718079));
     }
     for (Alarm a : Store.alarms(this)) {
       LinearLayout c = card(), row = new LinearLayout(this);
@@ -303,7 +328,7 @@ public class MainActivity extends Activity {
       TextView time = heading(a.time(), 36);
       row.addView(time, new LinearLayout.LayoutParams(0, -2, 1));
       Switch toggle = new Switch(this);
-      toggle.setContentDescription(a.time() + " 알람 사용");
+      toggle.setContentDescription(getString(R.string.alarm_toggle_description, a.time()));
       toggle.setChecked(a.enabled);
       toggle.setOnCheckedChangeListener(
           (v, on) -> {
@@ -311,27 +336,27 @@ public class MainActivity extends Activity {
             Scheduler.cancel(this, a.id);
             Store.save(this, a);
             boolean scheduled = Scheduler.schedule(this, a);
-            if (on && !scheduled) toast("알람은 저장됐습니다. 정확한 알람 권한을 허용해 주세요.");
+            if (on && !scheduled) toast(getString(R.string.saved_alarm_permission));
           });
       row.addView(toggle);
       c.addView(row);
-      c.addView(text(a.label + " · " + a.repeat(), 15, 0xff718079));
+      c.addView(text(a.label + " · " + a.repeat(this), 15, 0xff718079));
       LinearLayout actions = new LinearLayout(this);
       LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(0, -2, 1);
       actionParams.setMargins(dp(4), dp(5), dp(4), dp(5));
-      actions.addView(button("편집", () -> edit(a)), actionParams);
+      actions.addView(button(getString(R.string.edit), () -> edit(a)), actionParams);
       actionParams = new LinearLayout.LayoutParams(0, -2, 1);
       actionParams.setMargins(dp(4), dp(5), dp(4), dp(5));
       actions.addView(
           button(
-              "삭제",
+              getString(R.string.delete),
               () ->
                   new AlertDialog.Builder(this)
-                      .setTitle("알람 삭제")
-                      .setMessage(a.time() + " 알람을 삭제할까요?")
-                      .setNegativeButton("취소", null)
+                      .setTitle(R.string.delete_alarm_title)
+                      .setMessage(getString(R.string.delete_alarm_message, a.time()))
+                      .setNegativeButton(android.R.string.cancel, null)
                       .setPositiveButton(
-                          "삭제",
+                          getString(R.string.delete),
                           (d, w) -> {
                             Scheduler.cancel(this, a.id);
                             Store.delete(this, a.id);
@@ -355,11 +380,11 @@ public class MainActivity extends Activity {
     form.addView(picker);
     EditText label = new EditText(this);
     label.setSingleLine(true);
-    label.setHint("알람 이름");
-    label.setText(old == null ? "좋은 아침" : old.label);
+    label.setHint(R.string.alarm_label_hint);
+    label.setText(old == null ? getString(R.string.default_alarm_label) : old.label);
     form.addView(label);
-    form.addView(text("반복 요일 · 선택하지 않으면 한 번", 14, 0xff718079));
-    String[] names = {"월", "화", "수", "목", "금", "토", "일"};
+    form.addView(text(getString(R.string.repeat_days_optional), 14, 0xff718079));
+    String[] names = getResources().getStringArray(R.array.weekday_names);
     CheckBox[] days = new CheckBox[7];
     for (int start = 0; start < 7; start += 4) {
       LinearLayout row = new LinearLayout(this);
@@ -374,11 +399,11 @@ public class MainActivity extends Activity {
     ScrollView scroll = new ScrollView(this);
     scroll.addView(form);
     new AlertDialog.Builder(this)
-        .setTitle(old == null ? "새 알람" : "알람 편집")
+        .setTitle(old == null ? R.string.new_alarm : R.string.edit_alarm)
         .setView(scroll)
-        .setNegativeButton("취소", null)
+        .setNegativeButton(android.R.string.cancel, null)
         .setPositiveButton(
-            "저장",
+            getString(R.string.save),
             (d, w) -> {
               int mask = 0;
               for (int i = 0; i < 7; i++) if (days[i].isChecked()) mask |= 1 << i;
@@ -394,36 +419,36 @@ public class MainActivity extends Activity {
               Store.save(this, a);
               boolean ok = Scheduler.schedule(this, a);
               render();
-              if (!ok) toast("저장 완료. 정확한 알람 권한을 허용하면 예약됩니다.");
+              if (!ok) toast(getString(R.string.saved_alarm_needs_permission));
             })
         .show();
   }
 
   private void settingsPage() {
-    body.addView(heading("내 취향의 스키아", 26));
-    body.addView(text("시계 모양은 홈 화면 위젯에도 반영돼요.", 14, 0xff718079));
+    body.addView(heading(getString(R.string.settings_page_title), 26));
+    body.addView(text(getString(R.string.settings_page_subtitle), 14, 0xff718079));
     LinearLayout looks = card();
-    looks.addView(heading("시계 모양", 19));
-    setting(looks, "배경 표시", "background", true);
-    setting(looks, "눈금 표시", "ticks", true);
-    setting(looks, "숫자 표시", "numbers", true);
-    setting(looks, "24시간 표시", "24hour", true);
+    looks.addView(heading(getString(R.string.appearance), 19));
+    setting(looks, getString(R.string.show_background), "background", true);
+    setting(looks, getString(R.string.show_ticks), "ticks", true);
+    setting(looks, getString(R.string.show_numbers), "numbers", true);
+    setting(looks, getString(R.string.twenty_four_hour), "24hour", true);
     LinearLayout audio = card();
-    audio.addView(heading("소리와 진동", 19));
-    slider(audio, "알람 소리", "volume", 80);
-    audio.addView(text("기기의 알람 음량도 함께 적용됩니다.", 13, 0xff718079));
-    slider(audio, "터치 효과음", "effects", 80);
-    setting(audio, "알람 진동", "vibration", true);
+    audio.addView(heading(getString(R.string.sound_vibration), 19));
+    slider(audio, getString(R.string.alarm_volume), "volume", 80);
+    audio.addView(text(getString(R.string.device_alarm_volume_note), 13, 0xff718079));
+    slider(audio, getString(R.string.touch_volume), "effects", 80);
+    setting(audio, getString(R.string.alarm_vibration), "vibration", true);
     audio.addView(
         text(
             Store.prefs(this).getString("sound", "").isEmpty()
-                ? "알람음: 스키아 기본 음성"
-                : "알람음: 선택한 오디오 파일",
+                ? getString(R.string.alarm_sound_default)
+                : getString(R.string.alarm_sound_custom),
             14,
             0xff718079));
     audio.addView(
         button(
-            "알람 음성 파일 선택",
+            getString(R.string.choose_alarm_sound),
             () -> {
               Intent i =
                   new Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -436,7 +461,7 @@ public class MainActivity extends Activity {
             }));
     audio.addView(
         button(
-            "기본 알람음으로 되돌리기",
+            getString(R.string.reset_alarm_sound),
             () -> {
               clearSound();
               render();
@@ -446,26 +471,26 @@ public class MainActivity extends Activity {
     // Language setting card
     {
       LinearLayout langCard = card();
-      langCard.addView(heading(getString(R.string.lang_title), 19));
+      langCard.addView(heading(getString(R.string.language), 19));
 
-      final String[] langEntries = new String[] {getString(R.string.lang_system), getString(R.string.lang_korean), getString(R.string.lang_english)};
-      final String[] langValues = new String[] {"auto", "ko", "en"};
-
-      android.content.SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-      String cur = prefs.getString("selected_language", "auto");
+      final String[] langEntries = {
+        getString(R.string.language_auto),
+        getString(R.string.language_ko),
+        getString(R.string.language_ja),
+        getString(R.string.language_en)
+      };
+      final String[] langValues = {"auto", "ko", "ja", "en"};
+      String cur = LocaleHelper.selectedLanguage(this);
       int curIdx = 0;
       for (int i = 0; i < langValues.length; i++) if (langValues[i].equals(cur)) { curIdx = i; break; }
+      final int selectedIndex = curIdx;
 
-      Button langButton = button(getString(R.string.settings_language) + ": " + langEntries[curIdx], () -> {
+      Button langButton = button(getString(R.string.language) + ": " + langEntries[selectedIndex], () -> {
         new AlertDialog.Builder(this)
-            .setTitle(getString(R.string.lang_title))
-            .setSingleChoiceItems(langEntries, curIdx, (d, which) -> {
+            .setTitle(getString(R.string.language))
+            .setSingleChoiceItems(langEntries, selectedIndex, (d, which) -> {
               String sel = langValues[which];
-              if ("auto".equals(sel)) {
-                LocaleHelper.setLocale(this, java.util.Locale.getDefault().getLanguage());
-              } else {
-                LocaleHelper.setLocale(this, sel);
-              }
+              LocaleHelper.setLocale(this, sel);
               d.dismiss();
               recreate();
             })
@@ -475,10 +500,10 @@ public class MainActivity extends Activity {
       langCard.addView(langButton);
     }
 
-    body.addView(button("홈 화면에 시계 위젯 추가", this::pinWidget));
+    body.addView(button(getString(R.string.add_clock_widget), this::pinWidget));
     body.addView(
         text(
-            "스키아 시계 1.0 · Android\n위젯은 시계만 표시하고, 투명한 입력 영역을 누르면 캐릭터가 바로 반응합니다. 알람은 최대 10분간 울립니다.",
+            getString(R.string.settings_footer),
             13,
             0xff718079));
   }
@@ -498,7 +523,11 @@ public class MainActivity extends Activity {
   }
 
   private void slider(LinearLayout parent, String name, String key, int fallback) {
-    TextView t = text(name + "  " + Store.prefs(this).getInt(key, fallback) + "%", 15, 0xff233b35);
+    TextView t =
+        text(
+            getString(R.string.slider_value, name, Store.prefs(this).getInt(key, fallback)),
+            15,
+            0xff233b35);
     parent.addView(t);
     SeekBar s = new SeekBar(this);
     s.setContentDescription(name);
@@ -507,7 +536,7 @@ public class MainActivity extends Activity {
     s.setOnSeekBarChangeListener(
         new SeekBar.OnSeekBarChangeListener() {
           public void onProgressChanged(SeekBar b, int n, boolean user) {
-            t.setText(name + "  " + n + "%");
+            t.setText(getString(R.string.slider_value, name, n));
             if (user) Store.prefs(MainActivity.this).edit().putInt(key, n).apply();
           }
 
@@ -520,13 +549,18 @@ public class MainActivity extends Activity {
 
   private void permissions() {
     LinearLayout c = card();
-    c.addView(heading("알람 준비 상태", 17));
+    c.addView(heading(getString(R.string.alarm_status), 17));
     c.addView(
-        text(Scheduler.allowed(this) ? "✓ 정확한 시간에 알람 예약 가능" : "정확한 알람 권한이 필요해요", 14, 0xff29796e));
+        text(
+            Scheduler.allowed(this)
+                ? getString(R.string.exact_alarm_available)
+                : getString(R.string.exact_alarm_permission_needed),
+            14,
+            0xff29796e));
     if (!Scheduler.allowed(this))
       c.addView(
           button(
-              "정확한 알람 허용",
+              getString(R.string.allow_exact_alarm),
               () ->
                   startActivity(
                       new Intent(
@@ -536,7 +570,7 @@ public class MainActivity extends Activity {
     if (!nm.areNotificationsEnabled())
       c.addView(
           button(
-              "알람 알림 허용",
+              getString(R.string.allow_alarm_notifications),
               () -> {
                 if (Build.VERSION.SDK_INT >= 33
                     && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -554,7 +588,7 @@ public class MainActivity extends Activity {
     if (Build.VERSION.SDK_INT >= 34 && !nm.canUseFullScreenIntent())
       c.addView(
           button(
-              "잠금 화면 알람 허용",
+              getString(R.string.allow_lock_screen_alarm),
               () ->
                   startActivity(
                       new Intent(
@@ -567,7 +601,7 @@ public class MainActivity extends Activity {
     if (m.isRequestPinAppWidgetSupported()) {
       m.requestPinAppWidget(new ComponentName(this, ClockWidget.class), null, null);
       playCharacterSound("answer");
-    } else toast("홈 화면을 길게 누른 뒤 위젯 → 스키아 시계를 선택하세요.");
+    } else toast(getString(R.string.widget_manual_add_hint));
   }
 
   private void clearSound() {
@@ -594,7 +628,7 @@ public class MainActivity extends Activity {
         Store.prefs(this).edit().putString("sound", uri.toString()).apply();
         render();
       } catch (SecurityException e) {
-        toast("파일을 읽을 수 없습니다. 다른 오디오 파일을 선택해 주세요.");
+        toast(getString(R.string.audio_file_unreadable));
       }
     }
   }
